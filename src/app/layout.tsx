@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 const NAV_LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/", label: "Learners" },
   { href: "/advisors", label: "Advisors" },
   { href: "/assessors", label: "Assessors & Moderators" },
@@ -52,6 +53,22 @@ export default function RootLayout({
                 </Link>
               ))}
             </nav>
+            <a
+              href="/api/export"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-4 w-4"
+                aria-hidden
+              >
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+              Export to Excel
+            </a>
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
