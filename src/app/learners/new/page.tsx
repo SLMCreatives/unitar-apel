@@ -35,6 +35,7 @@ export default async function NewLearnerPage() {
         assessors={assessors}
         action={createLearner}
         submitLabel="Create learner"
+        showDocumentUpload
       />
     </div>
   );

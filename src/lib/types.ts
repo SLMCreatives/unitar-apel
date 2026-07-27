@@ -42,6 +42,36 @@ export const ASSESSOR_ROLES = ["INTERNAL", "EXTERNAL", "MODERATOR"] as const;
 
 export const ADVISOR_PAYMENT_MODES = ["TEACHING LOAD", "PAYMENT"] as const;
 
+// Roles a person can hold on a learner assignment (apel_assignments.role).
+export const PERSONNEL_ROLES = [
+  "ADVISOR",
+  "INTERNAL_ASSESSOR",
+  "EXTERNAL_ASSESSOR",
+  "MODERATOR",
+] as const;
+
+// Stages an assignment can apply to. A learner can have one assignment per
+// role per stage, each with its own claim and appointment-letter tracking.
+export const ASSIGNMENT_STAGES = [
+  "SELF ASSESSMENT",
+  "PORTFOLIO",
+  "FVV",
+  "CHALLENGE TEST",
+  "CAPSTONE",
+] as const;
+
+// Claim/payment progress for an assignment. Edit this list to change the
+// options everywhere — the database column is plain text.
+export const CLAIM_STATUSES = [
+  "NOT SUBMITTED",
+  "SUBMITTED",
+  "PROCESSING",
+  "PAID",
+  "REJECTED",
+] as const;
+
+export const APPOINTMENT_LETTER_STATUSES = ["PENDING", "ISSUED"] as const;
+
 export type LearnerStatus = (typeof LEARNER_STATUSES)[number];
 export type Sponsor = (typeof SPONSORS)[number];
 export type AssessmentStage = (typeof ASSESSMENT_STAGES)[number];
@@ -51,6 +81,11 @@ export type ResultStatus = (typeof RESULT_STATUSES)[number];
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type AssessorRole = (typeof ASSESSOR_ROLES)[number];
 export type AdvisorPaymentMode = (typeof ADVISOR_PAYMENT_MODES)[number];
+export type PersonnelRole = (typeof PERSONNEL_ROLES)[number];
+export type AssignmentStage = (typeof ASSIGNMENT_STAGES)[number];
+export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
+export type AppointmentLetterStatus =
+  (typeof APPOINTMENT_LETTER_STATUSES)[number];
 
 // Mirrors public.apel_advisors
 export type Advisor = {
@@ -129,6 +164,49 @@ export type Learner = {
   challenge_test_date: string | null;
   capstone_date: string | null;
   claim_submission_2_amount: number | null;
+};
+
+// Mirrors public.apel_assignments (see supabase/migrations). One row per
+// learner + role + stage; claim fields stay null for MODERATOR rows.
+export type Assignment = {
+  id: number;
+  learner_id: number;
+  personnel_name: string;
+  role: PersonnelRole;
+  stage: string | null;
+  payment_mode: string | null;
+  claim_status: string | null;
+  appointment_date: string | null;
+  appointment_letter_status: string | null;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AssignmentLearner = Pick<
+  Learner,
+  "id" | "name" | "learner_status" | "sponsor"
+>;
+
+export type AssignmentWithLearner = Assignment & {
+  learner: AssignmentLearner | null;
+};
+
+// Mirrors public.apel_documents (see supabase/migrations). Files live in the
+// private 'apel-documents' storage bucket; this row holds the metadata.
+export type ApelDocument = {
+  id: number;
+  learner_id: number;
+  assignment_id: number | null;
+  personnel_role: PersonnelRole | null;
+  document_category: string | null;
+  original_file_name: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number | null;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 // Mirrors public.apel_notes (see supabase/migrations)

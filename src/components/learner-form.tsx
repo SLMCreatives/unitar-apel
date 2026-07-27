@@ -13,12 +13,18 @@ import {
 } from "@/lib/types";
 import {
   DateInput,
+  FileInput,
   FormSection,
   SelectInput,
   TextArea,
   TextInput,
 } from "@/components/form-fields";
 import { OfferProgress } from "@/components/offer-progress";
+import {
+  DOCUMENT_ACCEPT,
+  DOCUMENT_CATEGORIES,
+  MAX_DOCUMENT_SIZE_MB,
+} from "@/lib/documents";
 
 export function LearnerForm({
   learner,
@@ -26,12 +32,16 @@ export function LearnerForm({
   assessors,
   action,
   submitLabel,
+  showDocumentUpload,
 }: {
   learner?: Learner;
   advisors: Advisor[];
   assessors: Assessor[];
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
+  // Shown on the Add Learner form — the file is stored and attached only
+  // after the learner record is created successfully.
+  showDocumentUpload?: boolean;
 }) {
   // The apel table stores people as names, so options use names as values.
   const namesByRole = (role: string) =>
@@ -326,6 +336,28 @@ export function LearnerForm({
           defaultValue={learner?.claim_submission_2_amount}
         />
       </FormSection>
+
+      {showDocumentUpload && (
+        <FormSection title="Documents (optional)">
+          <FileInput
+            label="Document"
+            name="document"
+            accept={DOCUMENT_ACCEPT}
+            hint={`Attached after the learner is created. Max ${MAX_DOCUMENT_SIZE_MB} MB.`}
+          />
+          <SelectInput
+            label="Document Category"
+            name="document_category"
+            options={DOCUMENT_CATEGORIES}
+            emptyLabel="— Optional —"
+          />
+          <TextInput
+            label="Uploaded By"
+            name="document_uploaded_by"
+            placeholder="Optional"
+          />
+        </FormSection>
+      )}
 
       <div className="flex justify-end">
         <button

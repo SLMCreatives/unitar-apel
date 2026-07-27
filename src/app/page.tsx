@@ -135,12 +135,16 @@ export default async function LearnersPage({
               <th className="px-4 py-3">Sponsor</th>
               <th className="px-4 py-3">12-month window</th>
               <th className="px-4 py-3">Contact</th>
+              <th className="px-4 py-3">Documents</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {learners.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                <td
+                  colSpan={10}
+                  className="px-4 py-8 text-center text-gray-400"
+                >
                   No learners found. Add your first learner to get started.
                 </td>
               </tr>
@@ -180,6 +184,14 @@ export default async function LearnersPage({
                     phone={l.contact_no_1 ?? l.contact_no_2}
                     email={l.email_1 ?? l.email_2}
                   />
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/learners/${l.id}#documents`}
+                    className="text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    Upload
+                  </Link>
                 </td>
               </tr>
             ))}

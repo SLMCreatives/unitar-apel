@@ -3,6 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  DOCUMENTS_BUCKET,
+  documentStoragePath,
+  validateDocument,
+} from "@/lib/documents";
+import { ROLE_CONFIG, roleConfigForAssessorRole } from "@/lib/roles";
+import {
+  ASSIGNMENT_STAGES,
+  PERSONNEL_ROLES,
+  type PersonnelRole,
+} from "@/lib/types";
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
@@ -74,9 +87,73 @@ function learnerPayload(fd: FormData) {
   };
 }
 
+function fileField(fd: FormData, key: string): File | null {
+  const v = fd.get(key);
+  if (!(v instanceof File) || !v.name || v.size === 0) return null;
+  return v;
+}
+
+// Mirrors the learner form's Assessor Details into apel_assignments so the
+// role pages can track stage, claims and appointment letters per assignment.
+// Best-effort: learner saves must keep working if migration 0002 has not been
+// run yet, so errors are swallowed here.
+async function syncAssignments(
+  supabase: Supabase,
+  learnerId: number,
+  payload: ReturnType<typeof learnerPayload>
+) {
+  const fields = payload as Record<string, string | number | null>;
+  const stage = (ASSIGNMENT_STAGES as readonly string[]).includes(
+    payload.assessment_stage ?? ""
+  )
+    ? payload.assessment_stage
+    : null;
+
+  for (const role of PERSONNEL_ROLES) {
+    const config = ROLE_CONFIG[role];
+    const name = fields[config.learnerNameColumn] as string | null;
+    if (!name) continue;
+    const appointmentDate = fields[config.learnerDateColumn] as string | null;
+
+    const existing = await supabase
+      .from("apel_assignments")
+      .select("id, stage")
+      .eq("learner_id", learnerId)
+      .eq("role", role);
+    if (existing.error) return; // table missing — migration 0002 not run yet
+
+    const match = (existing.data ?? []).find(
+      (a) => (a.stage ?? null) === stage
+    );
+    if (match) {
+      await supabase
+        .from("apel_assignments")
+        .update({ personnel_name: name, appointment_date: appointmentDate })
+        .eq("id", match.id);
+    } else {
+      await supabase.from("apel_assignments").insert({
+        learner_id: learnerId,
+        personnel_name: name,
+        role,
+        stage,
+        appointment_date: appointmentDate,
+      });
+    }
+    revalidatePath(config.route);
+  }
+}
+
 export async function createLearner(formData: FormData) {
   const payload = learnerPayload(formData);
   if (!payload.name) throw new Error("Learner name is required.");
+
+  // Validate the optional document before creating the learner, so a bad file
+  // never leaves a half-finished record or an orphaned upload behind.
+  const file = fileField(formData, "document");
+  if (file) {
+    const invalid = validateDocument(file);
+    if (invalid) throw new Error(invalid);
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -86,8 +163,26 @@ export async function createLearner(formData: FormData) {
     .single();
   if (error) throw new Error(error.message);
 
+  await syncAssignments(supabase, data.id, payload);
+
+  // The file is only stored once the learner exists — nothing to clean up if
+  // the insert above fails.
+  let docFailed = false;
+  if (file) {
+    try {
+      await storeDocument(supabase, {
+        file,
+        learnerId: data.id,
+        category: str(formData, "document_category"),
+        uploadedBy: str(formData, "document_uploaded_by"),
+      });
+    } catch {
+      docFailed = true;
+    }
+  }
+
   revalidatePath("/");
-  redirect(`/learners/${data.id}`);
+  redirect(`/learners/${data.id}${docFailed ? "?doc_error=1" : ""}`);
 }
 
 export async function updateLearner(id: number, formData: FormData) {
@@ -98,6 +193,8 @@ export async function updateLearner(id: number, formData: FormData) {
   const { error } = await supabase.from("apel").update(payload).eq("id", id);
   if (error) throw new Error(error.message);
 
+  await syncAssignments(supabase, id, payload);
+
   revalidatePath("/");
   revalidatePath(`/learners/${id}`);
   revalidatePath("/advisors");
@@ -105,6 +202,18 @@ export async function updateLearner(id: number, formData: FormData) {
 
 export async function deleteLearner(id: number) {
   const supabase = await createClient();
+
+  // Best-effort cleanup of the learner's uploaded files; the metadata rows go
+  // with the learner via ON DELETE CASCADE.
+  const files = await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .list(`learners/${id}`);
+  if (files.data && files.data.length > 0) {
+    await supabase.storage
+      .from(DOCUMENTS_BUCKET)
+      .remove(files.data.map((f) => `learners/${id}/${f.name}`));
+  }
+
   const { error } = await supabase.from("apel").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
@@ -187,7 +296,12 @@ export async function deleteAdvisor(id: number) {
   revalidatePath("/advisors");
 }
 
-// --- Assessors & moderators ---------------------------------------------------
+// --- Internal/external assessors & moderators ---------------------------------
+
+function revalidateAssessorPage(assessorRole: string | null) {
+  const config = roleConfigForAssessorRole(assessorRole);
+  if (config) revalidatePath(config.route);
+}
 
 export async function addAssessor(formData: FormData) {
   const name = str(formData, "name");
@@ -200,16 +314,290 @@ export async function addAssessor(formData: FormData) {
     .insert({ name, role });
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assessors");
+  revalidateAssessorPage(role);
+}
+
+export async function updateAssessor(id: number, formData: FormData) {
+  const name = str(formData, "name");
+  if (!name) return;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("apel_assessors")
+    .update({ name })
+    .eq("id", id)
+    .select("role")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  revalidateAssessorPage(data?.role ?? null);
 }
 
 export async function deleteAssessor(id: number) {
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("apel_assessors")
+    .delete()
+    .eq("id", id)
+    .select("role")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  revalidateAssessorPage(data?.role ?? null);
+}
+
+// --- Personnel assignments ------------------------------------------------------
+
+function assignmentPayload(fd: FormData) {
+  return {
+    stage: str(fd, "stage"),
+    payment_mode: str(fd, "payment_mode"),
+    claim_status: str(fd, "claim_status"),
+    appointment_date: str(fd, "appointment_date"),
+    appointment_letter_status: str(fd, "appointment_letter_status") ?? "PENDING",
+    remarks: str(fd, "remarks"),
+  };
+}
+
+// Moderators are not paid through this process — reject claim/payment values
+// even if a crafted request supplies them (the forms never render the fields).
+function assertClaimAllowed(
+  role: string,
+  payload: { claim_status: string | null; payment_mode: string | null }
+) {
+  const config = ROLE_CONFIG[role as PersonnelRole];
+  if (!config?.claimEnabled && (payload.claim_status || payload.payment_mode)) {
+    throw new Error(
+      `Claim/payment tracking does not apply to ${config?.label ?? role} assignments.`
+    );
+  }
+}
+
+function revalidateAssignmentPages(role: string, learnerId: number) {
+  const config = ROLE_CONFIG[role as PersonnelRole];
+  if (config) revalidatePath(config.route);
+  revalidatePath(`/learners/${learnerId}`);
+}
+
+export async function addAssignment(formData: FormData) {
+  const learnerId = num(formData, "learner_id");
+  const role = str(formData, "role");
+  const personnelName = str(formData, "personnel_name");
+  if (!learnerId || !personnelName) return;
+  if (!role || !(PERSONNEL_ROLES as readonly string[]).includes(role)) {
+    throw new Error("Unknown personnel role.");
+  }
+
+  const payload = assignmentPayload(formData);
+  assertClaimAllowed(role, payload);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("apel_assignments").insert({
+    learner_id: learnerId,
+    personnel_name: personnelName,
+    role,
+    ...payload,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidateAssignmentPages(role, learnerId);
+}
+
+export async function updateAssignment(id: number, formData: FormData) {
+  const supabase = await createClient();
+  const existing = await supabase
+    .from("apel_assignments")
+    .select("id, role, learner_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (!existing.data) throw new Error("Assignment not found.");
+
+  const payload = assignmentPayload(formData);
+  assertClaimAllowed(existing.data.role, payload);
+
+  const { error } = await supabase
+    .from("apel_assignments")
+    .update(payload)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidateAssignmentPages(existing.data.role, existing.data.learner_id);
+}
+
+export async function deleteAssignment(id: number) {
+  const supabase = await createClient();
+  const existing = await supabase
+    .from("apel_assignments")
+    .select("id, role, learner_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (!existing.data) return;
+
+  // Metadata rows cascade with the assignment; the stored files do not, so
+  // remove them first.
+  const docs = await supabase
+    .from("apel_documents")
+    .select("storage_path")
+    .eq("assignment_id", id);
+  if (docs.data && docs.data.length > 0) {
+    await supabase.storage
+      .from(DOCUMENTS_BUCKET)
+      .remove(docs.data.map((d) => d.storage_path));
+  }
+
+  const { error } = await supabase
+    .from("apel_assignments")
     .delete()
     .eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assessors");
+  revalidateAssignmentPages(existing.data.role, existing.data.learner_id);
+}
+
+// --- Documents ------------------------------------------------------------------
+
+async function storeDocument(
+  supabase: Supabase,
+  opts: {
+    file: File;
+    learnerId: number;
+    assignmentId?: number | null;
+    personnelRole?: string | null;
+    category?: string | null;
+    uploadedBy?: string | null;
+  }
+) {
+  const path = documentStoragePath(opts.learnerId, opts.file.name);
+  const upload = await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .upload(path, await opts.file.arrayBuffer(), {
+      contentType: opts.file.type || "application/octet-stream",
+    });
+  if (upload.error) throw new Error(upload.error.message);
+
+  const { error } = await supabase.from("apel_documents").insert({
+    learner_id: opts.learnerId,
+    assignment_id: opts.assignmentId ?? null,
+    personnel_role: opts.personnelRole ?? null,
+    document_category: opts.category ?? null,
+    original_file_name: opts.file.name,
+    storage_path: path,
+    mime_type: opts.file.type || null,
+    file_size: opts.file.size,
+    uploaded_by: opts.uploadedBy ?? null,
+  });
+  if (error) {
+    // Don't leave an unreferenced file behind.
+    await supabase.storage.from(DOCUMENTS_BUCKET).remove([path]);
+    throw new Error(error.message);
+  }
+}
+
+function revalidateDocumentPages(
+  learnerId: number,
+  personnelRole: string | null
+) {
+  revalidatePath(`/learners/${learnerId}`);
+  const config = ROLE_CONFIG[personnelRole as PersonnelRole];
+  if (config) revalidatePath(config.route);
+}
+
+export async function uploadDocument(formData: FormData) {
+  const learnerId = num(formData, "learner_id");
+  if (!learnerId) throw new Error("Missing learner.");
+
+  const file = fileField(formData, "document");
+  if (!file) throw new Error("Choose a file to upload.");
+  const invalid = validateDocument(file);
+  if (invalid) throw new Error(invalid);
+
+  const personnelRole = str(formData, "personnel_role");
+  const supabase = await createClient();
+  await storeDocument(supabase, {
+    file,
+    learnerId,
+    assignmentId: num(formData, "assignment_id"),
+    personnelRole,
+    category: str(formData, "document_category"),
+    uploadedBy: str(formData, "uploaded_by"),
+  });
+
+  revalidateDocumentPages(learnerId, personnelRole);
+}
+
+export async function replaceDocument(id: number, formData: FormData) {
+  const file = fileField(formData, "document");
+  if (!file) throw new Error("Choose a replacement file.");
+  const invalid = validateDocument(file);
+  if (invalid) throw new Error(invalid);
+
+  const supabase = await createClient();
+  const existing = await supabase
+    .from("apel_documents")
+    .select("id, learner_id, personnel_role, storage_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (!existing.data) throw new Error("Document not found.");
+
+  const path = documentStoragePath(existing.data.learner_id, file.name);
+  const upload = await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .upload(path, await file.arrayBuffer(), {
+      contentType: file.type || "application/octet-stream",
+    });
+  if (upload.error) throw new Error(upload.error.message);
+
+  const { error } = await supabase
+    .from("apel_documents")
+    .update({
+      original_file_name: file.name,
+      storage_path: path,
+      mime_type: file.type || null,
+      file_size: file.size,
+      uploaded_by: str(formData, "uploaded_by"),
+    })
+    .eq("id", id);
+  if (error) {
+    await supabase.storage.from(DOCUMENTS_BUCKET).remove([path]);
+    throw new Error(error.message);
+  }
+
+  // Remove the replaced file last — losing this cleanup is harmless.
+  await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .remove([existing.data.storage_path]);
+
+  revalidateDocumentPages(
+    existing.data.learner_id,
+    existing.data.personnel_role
+  );
+}
+
+export async function deleteDocument(id: number) {
+  const supabase = await createClient();
+  const existing = await supabase
+    .from("apel_documents")
+    .select("id, learner_id, personnel_role, storage_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (!existing.data) return;
+
+  const { error } = await supabase
+    .from("apel_documents")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .remove([existing.data.storage_path]);
+
+  revalidateDocumentPages(
+    existing.data.learner_id,
+    existing.data.personnel_role
+  );
 }

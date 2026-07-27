@@ -29,6 +29,19 @@ const RESULT_STYLES: Record<string, string> = {
   FAIL: "bg-red-100 text-red-700",
 };
 
+const CLAIM_STYLES: Record<string, string> = {
+  "NOT SUBMITTED": "bg-gray-100 text-gray-600",
+  SUBMITTED: "bg-blue-100 text-blue-800",
+  PROCESSING: "bg-amber-100 text-amber-800",
+  PAID: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-700",
+};
+
+const LETTER_STYLES: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-800",
+  ISSUED: "bg-green-100 text-green-800",
+};
+
 function badge(value: string | null, styles: Record<string, string>) {
   if (!value) return <span className="text-xs text-gray-400">—</span>;
   return (
@@ -52,4 +65,16 @@ export function PaymentBadge({ value }: { value: string | null }) {
 
 export function ResultBadge({ value }: { value: string | null }) {
   return badge(value, RESULT_STYLES);
+}
+
+export function ClaimStatusBadge({ value }: { value: string | null }) {
+  return badge(value, CLAIM_STYLES);
+}
+
+export function AppointmentLetterStatusBadge({
+  value,
+}: {
+  value: string | null;
+}) {
+  return badge(value, LETTER_STYLES);
 }

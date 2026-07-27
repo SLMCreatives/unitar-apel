@@ -103,6 +103,38 @@ export function SelectInput({
   );
 }
 
+export function FileInput({
+  label,
+  name,
+  accept,
+  hint,
+  required,
+}: {
+  label: string;
+  name: string;
+  accept?: string;
+  hint?: string;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label htmlFor={name} className={LABEL_CLASS}>
+        {label}
+        {required && <span className="text-red-500"> *</span>}
+      </label>
+      <input
+        id={name}
+        name={name}
+        type="file"
+        accept={accept}
+        required={required}
+        className="w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+      />
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+    </div>
+  );
+}
+
 export function TextArea({
   label,
   name,

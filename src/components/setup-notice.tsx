@@ -17,11 +17,10 @@ export function SetupNotice() {
           <span className="font-mono">supabase.com</span>
         </li>
         <li>
-          Run{" "}
-          <span className="font-mono">
-            supabase/migrations/0001_assessors_and_notes.sql
+          Run the SQL files in <span className="font-mono">
+            supabase/migrations
           </span>{" "}
-          in the SQL Editor
+          (0001, then 0002) in the SQL Editor
         </li>
         <li>
           Copy <span className="font-mono">.env.local.example</span> to{" "}
@@ -40,11 +39,9 @@ export function QueryError({ message }: { message: string }) {
       <p className="font-semibold">Could not load data</p>
       <p className="mt-1 font-mono text-xs">{message}</p>
       <p className="mt-2">
-        If tables are missing, run{" "}
-        <span className="font-mono">
-          supabase/migrations/0001_assessors_and_notes.sql
-        </span>{" "}
-        in the Supabase SQL Editor.
+        If tables are missing, run the SQL files in{" "}
+        <span className="font-mono">supabase/migrations</span> (0001, then
+        0002) in the Supabase SQL Editor.
       </p>
     </div>
   );

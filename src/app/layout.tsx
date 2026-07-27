@@ -23,7 +23,8 @@ const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/", label: "Learners" },
   { href: "/advisors", label: "Advisors" },
-  { href: "/assessors", label: "Assessors & Moderators" },
+  { href: "/internal-assessors", label: "Assessors & Moderators" },
+  { href: "/reports", label: "Reports" },
 ];
 
 export default function RootLayout({
@@ -42,7 +43,7 @@ export default function RootLayout({
             <Link href="/" className="text-base font-bold text-blue-900">
               UNITAR <span className="text-blue-600">APEL.Q</span> Tracker
             </Link>
-            <nav className="flex gap-1">
+            <nav className="flex flex-wrap gap-1">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}
