@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
 import { ASSESSMENT_STAGES, LEARNER_STATUSES } from "@/lib/types";
 
@@ -84,6 +85,7 @@ function BarList({
 
 export default async function DashboardPage() {
   if (!envReady()) return <SetupNotice />;
+  await requirePermission("dashboard");
 
   const supabase = await createClient();
   const [learnersRes, notesRes] = await Promise.all([

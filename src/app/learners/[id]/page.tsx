@@ -10,6 +10,7 @@ import { LearnerForm } from "@/components/learner-form";
 import { NotesPanel } from "@/components/notes-panel";
 import { OfferProgress } from "@/components/offer-progress";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
+import { requirePermission } from "@/lib/auth";
 import { ROLE_CONFIG } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -32,6 +33,7 @@ export default async function LearnerDetailPage({
   searchParams: Promise<{ doc_error?: string }>;
 }) {
   if (!envReady()) return <SetupNotice />;
+  await requirePermission("learners");
 
   const { id } = await params;
   const { doc_error } = await searchParams;

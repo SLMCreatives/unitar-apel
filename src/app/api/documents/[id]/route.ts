@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireActiveUser } from "@/lib/auth";
 import { DOCUMENTS_BUCKET } from "@/lib/documents";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Only signed-in, active users may fetch a download link.
+  await requireActiveUser();
+
   const { id } = await params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) {

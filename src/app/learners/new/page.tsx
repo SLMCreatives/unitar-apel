@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createLearner } from "@/app/actions";
 import { LearnerForm } from "@/components/learner-form";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
+import { requirePermission } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Advisor, Assessor } from "@/lib/types";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewLearnerPage() {
   if (!envReady()) return <SetupNotice />;
+  await requirePermission("learners");
 
   const supabase = await createClient();
   const [advisorsRes, assessorsRes] = await Promise.all([

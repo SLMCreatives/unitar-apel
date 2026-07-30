@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth";
 import { REPORT_FIELDS } from "@/lib/report-fields";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,9 @@ function addSheet(workbook: ExcelJS.Workbook, name: string, rows: Rows) {
 }
 
 export async function GET(request: Request) {
+  // Export is a data-exposing endpoint — same guard as the Reports page.
+  await requirePermission("reports");
+
   // The Reports page submits the chosen learner fields as repeated ?fields=
   // params. No params → full export (the header's Export to Excel link).
   const url = new URL(request.url);

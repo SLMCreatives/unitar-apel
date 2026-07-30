@@ -20,7 +20,9 @@ export function SetupNotice() {
           Run the SQL files in <span className="font-mono">
             supabase/migrations
           </span>{" "}
-          (0001, then 0002) in the SQL Editor
+          (0001, then 0002) in the SQL Editor. Skip 0003 — it turns on
+          authentication, which is switched off for now (run 0004 if 0003 has
+          already been applied).
         </li>
         <li>
           Copy <span className="font-mono">.env.local.example</span> to{" "}

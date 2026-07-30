@@ -99,10 +99,13 @@ export function LearnerForm({
           name="matric_no"
           defaultValue={learner?.matric_no}
         />
+        {/* Required because apel.ic_passport_no is NOT NULL — see the guard in
+            createLearner/updateLearner. */}
         <TextInput
           label="IC / Passport No"
           name="ic_passport_no"
           defaultValue={learner?.ic_passport_no}
+          required
         />
         <SelectInput
           label="Nationality"
@@ -120,11 +123,13 @@ export function LearnerForm({
           name="contact_no_2"
           defaultValue={learner?.contact_no_2}
         />
+        {/* Required because apel.email_1 is NOT NULL (email_2 is optional). */}
         <TextInput
           label="Email Address 1"
           name="email_1"
           type="email"
           defaultValue={learner?.email_1}
+          required
         />
         <TextInput
           label="Email Address 2"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth";
 import { StageBadge, StatusBadge } from "@/components/badges";
 import { ContactIcons } from "@/components/contact-buttons";
 import { OfferProgress } from "@/components/offer-progress";
@@ -18,6 +19,7 @@ export default async function LearnersPage({
   searchParams: Promise<{ q?: string; status?: string; stage?: string }>;
 }) {
   if (!envReady()) return <SetupNotice />;
+  await requirePermission("learners");
 
   const { q, status, stage } = await searchParams;
   const supabase = await createClient();

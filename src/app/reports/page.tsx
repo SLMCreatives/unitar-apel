@@ -1,9 +1,11 @@
 import { ReportFieldSelector } from "@/components/report-field-selector";
 import { REPORT_FIELDS } from "@/lib/report-fields";
+import { requirePermission } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  await requirePermission("reports");
   return (
     <div className="space-y-6">
       <div>

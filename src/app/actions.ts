@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requirePermission } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   DOCUMENTS_BUCKET,
@@ -9,6 +10,7 @@ import {
   validateDocument,
 } from "@/lib/documents";
 import { ROLE_CONFIG, roleConfigForAssessorRole } from "@/lib/roles";
+import { type SectionKey } from "@/lib/permissions";
 import {
   ASSIGNMENT_STAGES,
   PERSONNEL_ROLES,
@@ -16,6 +18,12 @@ import {
 } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// Advisor management lives under the "advisors" section; the three assessor
+// roles under "assessors". Used to guard the assignment actions by section.
+function sectionForRole(role: string): SectionKey {
+  return role === "ADVISOR" ? "advisors" : "assessors";
+}
 
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
@@ -87,6 +95,15 @@ function learnerPayload(fd: FormData) {
   };
 }
 
+// apel has NOT NULL on exactly these three columns, so a blank value otherwise
+// surfaces as an opaque Postgres error ("null value in column ... violates
+// not-null constraint"). The form marks all three required as well.
+function assertRequired(payload: ReturnType<typeof learnerPayload>) {
+  if (!payload.name) throw new Error("Learner name is required.");
+  if (!payload.ic_passport_no) throw new Error("IC / Passport No is required.");
+  if (!payload.email_1) throw new Error("Email Address 1 is required.");
+}
+
 function fileField(fd: FormData, key: string): File | null {
   const v = fd.get(key);
   if (!(v instanceof File) || !v.name || v.size === 0) return null;
@@ -144,8 +161,9 @@ async function syncAssignments(
 }
 
 export async function createLearner(formData: FormData) {
+  await requirePermission("learners");
   const payload = learnerPayload(formData);
-  if (!payload.name) throw new Error("Learner name is required.");
+  assertRequired(payload);
 
   // Validate the optional document before creating the learner, so a bad file
   // never leaves a half-finished record or an orphaned upload behind.
@@ -186,8 +204,9 @@ export async function createLearner(formData: FormData) {
 }
 
 export async function updateLearner(id: number, formData: FormData) {
+  await requirePermission("learners");
   const payload = learnerPayload(formData);
-  if (!payload.name) throw new Error("Learner name is required.");
+  assertRequired(payload);
 
   const supabase = await createClient();
   const { error } = await supabase.from("apel").update(payload).eq("id", id);
@@ -201,6 +220,7 @@ export async function updateLearner(id: number, formData: FormData) {
 }
 
 export async function deleteLearner(id: number) {
+  await requirePermission("learners");
   const supabase = await createClient();
 
   // Best-effort cleanup of the learner's uploaded files; the metadata rows go
@@ -224,6 +244,7 @@ export async function deleteLearner(id: number) {
 // --- Notes & follow-ups -----------------------------------------------------
 
 export async function addNote(learnerId: number, formData: FormData) {
+  await requirePermission("learners");
   const body = str(formData, "body");
   if (!body) return;
 
@@ -240,6 +261,7 @@ export async function addNote(learnerId: number, formData: FormData) {
 }
 
 export async function deleteNote(noteId: number, learnerId: number) {
+  await requirePermission("learners");
   const supabase = await createClient();
   const { error } = await supabase
     .from("apel_notes")
@@ -253,6 +275,7 @@ export async function deleteNote(noteId: number, learnerId: number) {
 // --- Advisors ----------------------------------------------------------------
 
 export async function addAdvisor(formData: FormData) {
+  await requirePermission("advisors");
   const name = str(formData, "advisor_name");
   if (!name) return;
 
@@ -268,6 +291,7 @@ export async function addAdvisor(formData: FormData) {
 }
 
 export async function updateAdvisor(id: number, formData: FormData) {
+  await requirePermission("advisors");
   const name = str(formData, "advisor_name");
   if (!name) return;
 
@@ -286,6 +310,7 @@ export async function updateAdvisor(id: number, formData: FormData) {
 }
 
 export async function deleteAdvisor(id: number) {
+  await requirePermission("advisors");
   const supabase = await createClient();
   const { error } = await supabase
     .from("apel_advisors")
@@ -304,6 +329,7 @@ function revalidateAssessorPage(assessorRole: string | null) {
 }
 
 export async function addAssessor(formData: FormData) {
+  await requirePermission("assessors");
   const name = str(formData, "name");
   const role = str(formData, "role");
   if (!name || !role) return;
@@ -318,6 +344,7 @@ export async function addAssessor(formData: FormData) {
 }
 
 export async function updateAssessor(id: number, formData: FormData) {
+  await requirePermission("assessors");
   const name = str(formData, "name");
   if (!name) return;
 
@@ -334,6 +361,7 @@ export async function updateAssessor(id: number, formData: FormData) {
 }
 
 export async function deleteAssessor(id: number) {
+  await requirePermission("assessors");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("apel_assessors")
@@ -387,6 +415,7 @@ export async function addAssignment(formData: FormData) {
   if (!role || !(PERSONNEL_ROLES as readonly string[]).includes(role)) {
     throw new Error("Unknown personnel role.");
   }
+  await requirePermission(sectionForRole(role));
 
   const payload = assignmentPayload(formData);
   assertClaimAllowed(role, payload);
@@ -412,6 +441,7 @@ export async function updateAssignment(id: number, formData: FormData) {
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
   if (!existing.data) throw new Error("Assignment not found.");
+  await requirePermission(sectionForRole(existing.data.role));
 
   const payload = assignmentPayload(formData);
   assertClaimAllowed(existing.data.role, payload);
@@ -434,6 +464,7 @@ export async function deleteAssignment(id: number) {
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
   if (!existing.data) return;
+  await requirePermission(sectionForRole(existing.data.role));
 
   // Metadata rows cascade with the assignment; the stored files do not, so
   // remove them first.
@@ -514,6 +545,9 @@ export async function uploadDocument(formData: FormData) {
   if (invalid) throw new Error(invalid);
 
   const personnelRole = str(formData, "personnel_role");
+  await requirePermission(
+    personnelRole ? sectionForRole(personnelRole) : "learners"
+  );
   const supabase = await createClient();
   await storeDocument(supabase, {
     file,
@@ -541,6 +575,11 @@ export async function replaceDocument(id: number, formData: FormData) {
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
   if (!existing.data) throw new Error("Document not found.");
+  await requirePermission(
+    existing.data.personnel_role
+      ? sectionForRole(existing.data.personnel_role)
+      : "learners"
+  );
 
   const path = documentStoragePath(existing.data.learner_id, file.name);
   const upload = await supabase.storage
@@ -585,6 +624,11 @@ export async function deleteDocument(id: number) {
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
   if (!existing.data) return;
+  await requirePermission(
+    existing.data.personnel_role
+      ? sectionForRole(existing.data.personnel_role)
+      : "learners"
+  );
 
   const { error } = await supabase
     .from("apel_documents")
