@@ -20,6 +20,7 @@ export const REPORT_FIELDS: ReportField[] = [
   { key: "email_2", label: "Email Address 2" },
   { key: "company_details", label: "Company Details" },
   { key: "position_title", label: "Position / Title" },
+  { key: "external_links", label: "External Folder Links" },
   { key: "programme_details", label: "Programme Details", recommended: true },
   { key: "assigned_counsellor", label: "Assigned Counsellor" },
   { key: "mqa_approval_date", label: "MQA Approval Date" },

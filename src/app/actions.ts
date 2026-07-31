@@ -59,6 +59,7 @@ function learnerPayload(fd: FormData) {
     email_2: str(fd, "email_2"),
     company_details: str(fd, "company_details"),
     position_title: str(fd, "position_title"),
+    external_links: str(fd, "external_links"),
     // Screening outcome
     candidate_background: str(fd, "candidate_background"),
     years_of_experience: num(fd, "years_of_experience"),
@@ -102,6 +103,22 @@ function assertRequired(payload: ReturnType<typeof learnerPayload>) {
   if (!payload.name) throw new Error("Learner name is required.");
   if (!payload.ic_passport_no) throw new Error("IC / Passport No is required.");
   if (!payload.email_1) throw new Error("Email Address 1 is required.");
+}
+
+// Learner columns arrive with migrations run by hand in the Supabase SQL
+// Editor, so a skipped migration surfaces as an opaque Postgres error on save
+// ("column apel.external_links does not exist"). Name the migration instead.
+const COLUMN_MIGRATIONS: Record<string, string> = {
+  external_links: "0005_learner_external_links.sql",
+};
+
+function describeSaveError(message: string): string {
+  for (const [column, migration] of Object.entries(COLUMN_MIGRATIONS)) {
+    if (message.includes(column)) {
+      return `${message} — run supabase/migrations/${migration} in the Supabase SQL Editor.`;
+    }
+  }
+  return message;
 }
 
 function fileField(fd: FormData, key: string): File | null {
@@ -179,7 +196,7 @@ export async function createLearner(formData: FormData) {
     .insert(payload)
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(describeSaveError(error.message));
 
   await syncAssignments(supabase, data.id, payload);
 
@@ -210,7 +227,7 @@ export async function updateLearner(id: number, formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("apel").update(payload).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(describeSaveError(error.message));
 
   await syncAssignments(supabase, id, payload);
 
@@ -282,7 +299,6 @@ export async function addAdvisor(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("apel_advisors").insert({
     advisor_name: name,
-    advisor_payment_mode: str(formData, "advisor_payment_mode"),
     advisor_remark: str(formData, "advisor_remark"),
   });
   if (error) throw new Error(error.message);
@@ -300,7 +316,6 @@ export async function updateAdvisor(id: number, formData: FormData) {
     .from("apel_advisors")
     .update({
       advisor_name: name,
-      advisor_payment_mode: str(formData, "advisor_payment_mode"),
       advisor_remark: str(formData, "advisor_remark"),
     })
     .eq("id", id);

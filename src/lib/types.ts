@@ -40,6 +40,8 @@ export const PAYMENT_STATUSES = ["PAID", "UNPAID", "WAIVED"] as const;
 
 export const ASSESSOR_ROLES = ["INTERNAL", "EXTERNAL", "MODERATOR"] as const;
 
+// How a claim-enabled assignment is paid. Tracked per learner assignment
+// (apel_assignments.payment_mode), not on the advisor record.
 export const ADVISOR_PAYMENT_MODES = ["TEACHING LOAD", "PAYMENT"] as const;
 
 // Roles a person can hold on a learner assignment (apel_assignments.role).
@@ -80,14 +82,15 @@ export type InstrumentLevel = (typeof INSTRUMENT_LEVELS)[number];
 export type ResultStatus = (typeof RESULT_STATUSES)[number];
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type AssessorRole = (typeof ASSESSOR_ROLES)[number];
-export type AdvisorPaymentMode = (typeof ADVISOR_PAYMENT_MODES)[number];
 export type PersonnelRole = (typeof PERSONNEL_ROLES)[number];
 export type AssignmentStage = (typeof ASSIGNMENT_STAGES)[number];
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 export type AppointmentLetterStatus =
   (typeof APPOINTMENT_LETTER_STATUSES)[number];
 
-// Mirrors public.apel_advisors
+// Mirrors public.apel_advisors. The table also still has the legacy
+// advisor_payment_mode column — payment mode is tracked per learner assignment
+// now (apel_assignments.payment_mode), so the app no longer reads or writes it.
 export type Advisor = {
   id: number;
   created_at: string;
@@ -98,7 +101,6 @@ export type Advisor = {
   learner_current_status: string | null;
   learner_fees_sponsor: string | null;
   advisor_remark: string | null;
-  advisor_payment_mode: AdvisorPaymentMode | null;
 };
 
 // Mirrors public.apel_assessors (see supabase/migrations)
@@ -131,6 +133,9 @@ export type Learner = {
   email_2: string | null;
   company_details: string | null;
   position_title: string | null;
+  // Links to external evidence folders — one per line, optionally
+  // "Label | URL". See src/lib/external-links.ts.
+  external_links: string | null;
   // Screening outcome
   candidate_background: string | null;
   years_of_experience: number | null;

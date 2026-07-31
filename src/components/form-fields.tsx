@@ -140,11 +140,18 @@ export function TextArea({
   name,
   defaultValue,
   rows = 3,
+  placeholder,
+  hint,
+  children,
 }: {
   label: string;
   name: string;
   defaultValue?: string | null;
   rows?: number;
+  placeholder?: string;
+  hint?: string;
+  // Rendered under the hint — e.g. a preview of what the entered text becomes.
+  children?: React.ReactNode;
 }) {
   return (
     <div className="sm:col-span-2 lg:col-span-3">
@@ -155,9 +162,12 @@ export function TextArea({
         id={name}
         name={name}
         rows={rows}
+        placeholder={placeholder}
         defaultValue={defaultValue ?? ""}
         className={INPUT_CLASS}
       />
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {children}
     </div>
   );
 }

@@ -29,7 +29,6 @@ import {
 type Person = {
   id: number;
   name: string;
-  paymentMode?: string | null;
   remark?: string | null;
 };
 
@@ -83,7 +82,6 @@ export async function RolePage({
     ? (personnelRes.data as Advisor[]).map((a) => ({
         id: a.id,
         name: a.advisor_name,
-        paymentMode: a.advisor_payment_mode,
         remark: a.advisor_remark,
       }))
     : (personnelRes.data as Assessor[]).map((a) => ({
@@ -247,25 +245,6 @@ export async function RolePage({
           />
         </div>
         {isAdvisor && (
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              Payment mode
-            </label>
-            <select
-              name="advisor_payment_mode"
-              defaultValue=""
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">— Not set —</option>
-              {ADVISOR_PAYMENT_MODES.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {isAdvisor && (
           <div className="min-w-[12rem] flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">
               Remark
@@ -400,14 +379,6 @@ export async function RolePage({
                         {(byPersonnelName.get(person.name) ?? []).length}
                       </span>
                     </span>
-                    {isAdvisor && (
-                      <span>
-                        Payment mode:{" "}
-                        <span className="font-medium text-gray-700">
-                          {person.paymentMode ?? "—"}
-                        </span>
-                      </span>
-                    )}
                     {person.remark && <span>Remark: {person.remark}</span>}
                   </div>
                 </div>
@@ -461,23 +432,6 @@ export async function RolePage({
                         defaultValue={person.name}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                       />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">
-                        Payment mode
-                      </label>
-                      <select
-                        name="advisor_payment_mode"
-                        defaultValue={person.paymentMode ?? ""}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        <option value="">— Not set —</option>
-                        {ADVISOR_PAYMENT_MODES.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                     <div className="min-w-[12rem] flex-1">
                       <label className="mb-1 block text-xs font-medium text-gray-600">

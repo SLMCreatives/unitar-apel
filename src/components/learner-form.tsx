@@ -19,6 +19,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form-fields";
+import { ExternalLinkList } from "@/components/external-link-list";
 import { OfferProgress } from "@/components/offer-progress";
 import {
   DOCUMENT_ACCEPT,
@@ -340,6 +341,21 @@ export function LearnerForm({
           step="0.01"
           defaultValue={learner?.claim_submission_2_amount}
         />
+      </FormSection>
+
+      <FormSection title="External Folder Links">
+        <TextArea
+          label="Folder Links"
+          name="external_links"
+          rows={4}
+          defaultValue={learner?.external_links}
+          placeholder={
+            "Portfolio evidence | https://drive.google.com/drive/folders/…\nhttps://unitar.sharepoint.com/sites/apel/…"
+          }
+          hint="One link per line. Add an optional name before a | to label it. Saved links become clickable below."
+        >
+          <ExternalLinkList value={learner?.external_links ?? null} />
+        </TextArea>
       </FormSection>
 
       {showDocumentUpload && (
