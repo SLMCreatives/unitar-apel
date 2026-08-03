@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { syncAssignments } from "@/lib/assignments";
 import { createClient } from "@/lib/supabase/server";
 import {
   DOCUMENTS_BUCKET,
@@ -11,11 +12,7 @@ import {
 } from "@/lib/documents";
 import { ROLE_CONFIG, roleConfigForAssessorRole } from "@/lib/roles";
 import { type SectionKey } from "@/lib/permissions";
-import {
-  ASSIGNMENT_STAGES,
-  PERSONNEL_ROLES,
-  type PersonnelRole,
-} from "@/lib/types";
+import { PERSONNEL_ROLES, type PersonnelRole } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -125,56 +122,6 @@ function fileField(fd: FormData, key: string): File | null {
   const v = fd.get(key);
   if (!(v instanceof File) || !v.name || v.size === 0) return null;
   return v;
-}
-
-// Mirrors the learner form's Assessor Details into apel_assignments so the
-// role pages can track stage, claims and appointment letters per assignment.
-// Best-effort: learner saves must keep working if migration 0002 has not been
-// run yet, so errors are swallowed here.
-async function syncAssignments(
-  supabase: Supabase,
-  learnerId: number,
-  payload: ReturnType<typeof learnerPayload>
-) {
-  const fields = payload as Record<string, string | number | null>;
-  const stage = (ASSIGNMENT_STAGES as readonly string[]).includes(
-    payload.assessment_stage ?? ""
-  )
-    ? payload.assessment_stage
-    : null;
-
-  for (const role of PERSONNEL_ROLES) {
-    const config = ROLE_CONFIG[role];
-    const name = fields[config.learnerNameColumn] as string | null;
-    if (!name) continue;
-    const appointmentDate = fields[config.learnerDateColumn] as string | null;
-
-    const existing = await supabase
-      .from("apel_assignments")
-      .select("id, stage")
-      .eq("learner_id", learnerId)
-      .eq("role", role);
-    if (existing.error) return; // table missing — migration 0002 not run yet
-
-    const match = (existing.data ?? []).find(
-      (a) => (a.stage ?? null) === stage
-    );
-    if (match) {
-      await supabase
-        .from("apel_assignments")
-        .update({ personnel_name: name, appointment_date: appointmentDate })
-        .eq("id", match.id);
-    } else {
-      await supabase.from("apel_assignments").insert({
-        learner_id: learnerId,
-        personnel_name: name,
-        role,
-        stage,
-        appointment_date: appointmentDate,
-      });
-    }
-    revalidatePath(config.route);
-  }
 }
 
 export async function createLearner(formData: FormData) {

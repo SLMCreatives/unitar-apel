@@ -53,12 +53,20 @@ export default async function LearnersPage({
             ({learners.length})
           </span>
         </h1>
-        <Link
-          href="/learners/new"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-        >
-          + Add learner
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/learners/new"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          >
+            + Add learner
+          </Link>
+          <Link
+            href="/learners/bulk"
+            className="rounded-md border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+          >
+            Bulk upload
+          </Link>
+        </div>
       </div>
 
       <form className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-white p-3">
