@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteLearner, updateLearner } from "@/app/actions";
+import { deleteLearner, saveLearner } from "@/app/actions";
 import { AssignmentCard } from "@/components/assignment-card";
 import { StageBadge, StatusBadge } from "@/components/badges";
 import { ConfirmButton } from "@/components/confirm-button";
 import { ContactButtons } from "@/components/contact-buttons";
 import { DocumentList, DocumentUpload } from "@/components/document-upload";
-import { LearnerForm } from "@/components/learner-form";
+import {
+  LearnerEditForm,
+  LearnerEditor,
+  LearnerSaveBar,
+} from "@/components/learner-editor";
+import { LearnerFormFields } from "@/components/learner-form";
 import { NotesPanel } from "@/components/notes-panel";
 import { OfferProgress } from "@/components/offer-progress";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
@@ -122,14 +127,6 @@ export default async function LearnerDetailPage({
             />
           </div>
         </div>
-        <form action={deleteLearner.bind(null, learner.id)}>
-          <ConfirmButton
-            message={`Delete ${learner.name}? This also deletes their notes and cannot be undone.`}
-            className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete learner
-          </ConfirmButton>
-        </form>
       </div>
 
       {doc_error && (
@@ -139,86 +136,104 @@ export default async function LearnerDetailPage({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          <LearnerForm
-            learner={learner}
-            advisors={(advisorsRes.data ?? []) as Advisor[]}
-            assessors={(assessorsRes.data ?? []) as Assessor[]}
-            action={updateLearner.bind(null, learner.id)}
-            submitLabel="Save changes"
-          />
+      {/* Spans both columns so Save and Delete sit above Notes & Follow-ups
+          as well as the form. */}
+      <LearnerEditor action={saveLearner.bind(null, learner.id)}>
+        <LearnerSaveBar
+          deleteSlot={
+            <form action={deleteLearner.bind(null, learner.id)}>
+              <ConfirmButton
+                message={`Delete ${learner.name}? This also deletes their notes and cannot be undone.`}
+                className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Delete learner
+              </ConfirmButton>
+            </form>
+          }
+        />
 
-          <section
-            id="assignments"
-            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
-          >
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-700">
-              Personnel Assignments
-            </h2>
-            {assignmentsTableMissing ? (
-              <p className="text-sm text-amber-800">
-                The assignments table doesn&apos;t exist yet. Run{" "}
-                <span className="font-mono">
-                  supabase/migrations/0002_assignments_and_documents.sql
-                </span>{" "}
-                in the Supabase SQL Editor to enable per-stage claim and
-                appointment-letter tracking.
-              </p>
-            ) : assignments.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                No assignments yet. Assign personnel in the Assessor Details
-                section above and save — the records appear here and on the
-                role pages.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {assignments.map((a) => (
-                  <AssignmentCard
-                    key={a.id}
-                    assignment={a}
-                    config={ROLE_CONFIG[a.role]}
-                    documents={docsByAssignment.get(a.id) ?? []}
-                    showLearner={false}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+        <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="space-y-6 xl:col-span-2">
+            <LearnerEditForm>
+              <LearnerFormFields
+                learner={learner}
+                advisors={(advisorsRes.data ?? []) as Advisor[]}
+                assessors={(assessorsRes.data ?? []) as Assessor[]}
+              />
+            </LearnerEditForm>
 
-          <section
-            id="documents"
-            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
-          >
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-700">
-              Documents
-            </h2>
-            {documentsRes.error ? (
-              <p className="text-sm text-amber-800">
-                The documents table doesn&apos;t exist yet. Run{" "}
-                <span className="font-mono">
-                  supabase/migrations/0002_assignments_and_documents.sql
-                </span>{" "}
-                in the Supabase SQL Editor to enable document uploads.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <DocumentList documents={learnerDocuments} />
-                <DocumentUpload learnerId={learner.id} />
-              </div>
-            )}
-          </section>
-        </div>
-        <div className="xl:col-span-1">
-          <div className="xl:sticky xl:top-6">
-            <NotesPanel
-              learnerId={learner.id}
-              notes={notes}
-              tableMissing={notesTableMissing}
-            />
+            <section
+              id="assignments"
+              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Personnel Assignments
+              </h2>
+              {assignmentsTableMissing ? (
+                <p className="text-sm text-amber-800">
+                  The assignments table doesn&apos;t exist yet. Run{" "}
+                  <span className="font-mono">
+                    supabase/migrations/0002_assignments_and_documents.sql
+                  </span>{" "}
+                  in the Supabase SQL Editor to enable per-stage claim and
+                  appointment-letter tracking.
+                </p>
+              ) : assignments.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  No assignments yet. Assign personnel in the Assessor Details
+                  section above and save — the records appear here and on the
+                  role pages.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {assignments.map((a) => (
+                    <AssignmentCard
+                      key={a.id}
+                      assignment={a}
+                      config={ROLE_CONFIG[a.role]}
+                      documents={docsByAssignment.get(a.id) ?? []}
+                      showLearner={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section
+              id="documents"
+              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Documents
+              </h2>
+              {documentsRes.error ? (
+                <p className="text-sm text-amber-800">
+                  The documents table doesn&apos;t exist yet. Run{" "}
+                  <span className="font-mono">
+                    supabase/migrations/0002_assignments_and_documents.sql
+                  </span>{" "}
+                  in the Supabase SQL Editor to enable document uploads.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <DocumentList documents={learnerDocuments} />
+                  <DocumentUpload learnerId={learner.id} />
+                </div>
+              )}
+            </section>
+          </div>
+          <div className="xl:col-span-1">
+            {/* top-24 clears the sticky action bar above. */}
+            <div className="xl:sticky xl:top-24">
+              <NotesPanel
+                learnerId={learner.id}
+                notes={notes}
+                tableMissing={notesTableMissing}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </LearnerEditor>
     </div>
   );
 }

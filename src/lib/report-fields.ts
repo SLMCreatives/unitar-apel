@@ -1,4 +1,5 @@
-import type { Learner } from "@/lib/types";
+import { instrumentColumns } from "@/lib/instruments";
+import { ASSESSMENT_INSTRUMENTS, type Learner } from "@/lib/types";
 
 // Learner fields available to the report builder, in display and export
 // order. Add new fields here — the Reports page and /api/export pick them up
@@ -56,11 +57,22 @@ export const REPORT_FIELDS: ReportField[] = [
     label: "Offer Letter Issued Date",
     recommended: true,
   },
-  { key: "assessment_instrument_level", label: "Assessment Instrument Level" },
-  { key: "result_status", label: "Status (Pass / Fail)", recommended: true },
-  { key: "gpa", label: "GPA" },
-  { key: "cgpa", label: "CGPA" },
-  { key: "apel_examination_board_date", label: "AEB Date" },
+  // One status/GPA/CGPA column per assessment instrument.
+  ...ASSESSMENT_INSTRUMENTS.flatMap(({ level, prefix }): ReportField[] => {
+    const cols = instrumentColumns(prefix);
+    return [
+      {
+        key: cols.resultStatus as ReportField["key"],
+        label: `${level} — Status (Pass / Fail)`,
+        recommended: true,
+      },
+      { key: cols.gpa as ReportField["key"], label: `${level} — GPA` },
+      { key: cols.cgpa as ReportField["key"], label: `${level} — CGPA` },
+    ];
+  }),
+  // Kept so previously recorded AEB dates stay exportable. The learner form
+  // no longer edits this and nothing writes to it.
+  { key: "apel_examination_board_date", label: "AEB Date (historical)" },
   { key: "senate_date", label: "Senate Date" },
   { key: "progress_remark", label: "Progress Remark" },
   { key: "portfolio_date", label: "Portfolio Date" },

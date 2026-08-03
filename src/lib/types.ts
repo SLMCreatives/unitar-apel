@@ -26,15 +26,22 @@ export const SELF_ASSESSMENT_STATUSES = [
   "ONGOING",
 ] as const;
 
-export const INSTRUMENT_LEVELS = [
-  "PORTFOLIO",
-  "FVV",
-  "CHALLENGE TEST",
-  "CAPSTONE",
-  "COMPLETED",
+export const RESULT_STATUSES = ["PASS", "FAIL"] as const;
+
+// The assessment instruments a learner is graded on, in the order they are
+// sat. Each carries its own result/GPA/CGPA on apel, in columns named with
+// the prefix below — matching the existing <prefix>_date milestone columns.
+// This list is the single source of truth: the learner form, reports, the
+// bulk importer and the dashboard all build their fields from it.
+export const ASSESSMENT_INSTRUMENTS = [
+  { level: "PORTFOLIO", prefix: "portfolio" },
+  { level: "FVV", prefix: "fvv" },
+  { level: "CHALLENGE TEST", prefix: "challenge_test" },
+  { level: "CAPSTONE", prefix: "capstone" },
 ] as const;
 
-export const RESULT_STATUSES = ["PASS", "FAIL"] as const;
+export type AssessmentInstrument = (typeof ASSESSMENT_INSTRUMENTS)[number];
+export type InstrumentPrefix = AssessmentInstrument["prefix"];
 
 export const PAYMENT_STATUSES = ["PAID", "UNPAID", "WAIVED"] as const;
 
@@ -78,7 +85,6 @@ export type LearnerStatus = (typeof LEARNER_STATUSES)[number];
 export type Sponsor = (typeof SPONSORS)[number];
 export type AssessmentStage = (typeof ASSESSMENT_STAGES)[number];
 export type SelfAssessmentStatus = (typeof SELF_ASSESSMENT_STATUSES)[number];
-export type InstrumentLevel = (typeof INSTRUMENT_LEVELS)[number];
 export type ResultStatus = (typeof RESULT_STATUSES)[number];
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type AssessorRole = (typeof ASSESSOR_ROLES)[number];
@@ -155,10 +161,25 @@ export type Learner = {
   self_assessment_status: SelfAssessmentStatus | null;
   self_assessment_date_completed: string | null;
   offer_letter_issued_date: string | null;
-  assessment_instrument_level: InstrumentLevel | null;
-  result_status: ResultStatus | null;
-  gpa: number | null;
-  cgpa: number | null;
+  // Per-instrument results. The legacy single-result columns
+  // (assessment_instrument_level, result_status, gpa, cgpa) still exist on the
+  // table — migration 0006 copied their values onto the matching instrument
+  // below, and nothing reads them any more.
+  portfolio_result_status: ResultStatus | null;
+  portfolio_gpa: number | null;
+  portfolio_cgpa: number | null;
+  fvv_result_status: ResultStatus | null;
+  fvv_gpa: number | null;
+  fvv_cgpa: number | null;
+  challenge_test_result_status: ResultStatus | null;
+  challenge_test_gpa: number | null;
+  challenge_test_cgpa: number | null;
+  capstone_result_status: ResultStatus | null;
+  capstone_gpa: number | null;
+  capstone_cgpa: number | null;
+  // No longer editable — removed from the learner form, and excluded from
+  // learnerPayload so saves leave the recorded dates alone. Read-only history,
+  // still exportable via Reports.
   apel_examination_board_date: string | null;
   senate_date: string | null;
   progress_remark: string | null;

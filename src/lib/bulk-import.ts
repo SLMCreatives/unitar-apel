@@ -5,9 +5,10 @@
 // src/app/actions.ts — that function defines what a learner save writes, and
 // this list defines what an import can fill in.
 
+import { instrumentColumns } from "@/lib/instruments";
 import {
+  ASSESSMENT_INSTRUMENTS,
   ASSESSMENT_STAGES,
-  INSTRUMENT_LEVELS,
   LEARNER_STATUSES,
   PAYMENT_STATUSES,
   RESULT_STATUSES,
@@ -65,11 +66,31 @@ export const LEARNER_IMPORT_FIELDS: ImportField[] = [
   { key: "self_assessment_status", label: "Self-Assessment Status", type: "enum", options: SELF_ASSESSMENT_STATUSES },
   { key: "self_assessment_date_completed", label: "Self-Assessment Date Completed", type: "date" },
   { key: "offer_letter_issued_date", label: "Offer Letter Issued Date", type: "date" },
-  { key: "assessment_instrument_level", label: "Assessment Instrument Level", type: "enum", options: INSTRUMENT_LEVELS },
-  { key: "result_status", label: "Status (Pass / Fail)", type: "enum", options: RESULT_STATUSES, aliases: ["result", "pass fail"] },
-  { key: "gpa", label: "GPA", type: "number" },
-  { key: "cgpa", label: "CGPA", type: "number" },
-  { key: "apel_examination_board_date", label: "AEB Date", type: "date", aliases: ["apel examination board date", "aeb"] },
+  // One status/GPA/CGPA column per assessment instrument.
+  ...ASSESSMENT_INSTRUMENTS.flatMap(({ level, prefix }): ImportField[] => {
+    const cols = instrumentColumns(prefix);
+    return [
+      {
+        key: cols.resultStatus as ImportField["key"],
+        label: `${level} — Status (Pass / Fail)`,
+        type: "enum",
+        options: RESULT_STATUSES,
+        aliases: [`${level} result`, `${level} status`, `${prefix} result status`],
+      },
+      {
+        key: cols.gpa as ImportField["key"],
+        label: `${level} — GPA`,
+        type: "number",
+        aliases: [`${prefix} gpa`],
+      },
+      {
+        key: cols.cgpa as ImportField["key"],
+        label: `${level} — CGPA`,
+        type: "number",
+        aliases: [`${prefix} cgpa`],
+      },
+    ];
+  }),
   { key: "senate_date", label: "Senate Date", type: "date" },
   { key: "progress_remark", label: "Progress Remark", type: "text", aliases: ["remark"] },
   { key: "portfolio_date", label: "Portfolio Date", type: "date" },

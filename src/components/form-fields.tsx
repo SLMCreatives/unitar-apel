@@ -1,7 +1,9 @@
-const INPUT_CLASS =
+// Exported so other form components (e.g. the instrument results grid) style
+// their inputs identically instead of re-declaring these.
+export const INPUT_CLASS =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
-const LABEL_CLASS = "block text-xs font-medium text-gray-600 mb-1";
+export const LABEL_CLASS = "block text-xs font-medium text-gray-600 mb-1";
 
 export function TextInput({
   label,

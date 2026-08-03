@@ -1,10 +1,8 @@
 import { COUNTRIES } from "@/lib/countries";
 import {
   ASSESSMENT_STAGES,
-  INSTRUMENT_LEVELS,
   LEARNER_STATUSES,
   PAYMENT_STATUSES,
-  RESULT_STATUSES,
   SELF_ASSESSMENT_STATUSES,
   SPONSORS,
   type Advisor,
@@ -20,6 +18,7 @@ import {
   TextInput,
 } from "@/components/form-fields";
 import { ExternalLinkList } from "@/components/external-link-list";
+import { InstrumentResults } from "@/components/instrument-results";
 import { OfferProgress } from "@/components/offer-progress";
 import {
   DOCUMENT_ACCEPT,
@@ -27,19 +26,18 @@ import {
   MAX_DOCUMENT_SIZE_MB,
 } from "@/lib/documents";
 
-export function LearnerForm({
+// Every field of a learner, with no <form> around them. Split out from
+// LearnerForm so the edit page can put the same fields inside its autosaving
+// editor shell, while the Add Learner page keeps a plain form + submit.
+export function LearnerFormFields({
   learner,
   advisors,
   assessors,
-  action,
-  submitLabel,
   showDocumentUpload,
 }: {
   learner?: Learner;
   advisors: Advisor[];
   assessors: Assessor[];
-  action: (formData: FormData) => Promise<void>;
-  submitLabel: string;
   // Shown on the Add Learner form — the file is stored and attached only
   // after the learner record is created successfully.
   showDocumentUpload?: boolean;
@@ -54,7 +52,7 @@ export function LearnerForm({
   const moderatorOptions = namesByRole("MODERATOR");
 
   return (
-    <form action={action} className="space-y-6">
+    <>
       <FormSection title="Learner Details Information">
         <TextInput
           label="Name (as per IC / Passport)"
@@ -261,39 +259,7 @@ export function LearnerForm({
             </div>
           )}
         </div>
-        <SelectInput
-          label="Assessment Instrument Level"
-          name="assessment_instrument_level"
-          options={INSTRUMENT_LEVELS}
-          defaultValue={learner?.assessment_instrument_level}
-        />
-        <SelectInput
-          label="Status (Pass / Fail)"
-          name="result_status"
-          options={RESULT_STATUSES}
-          defaultValue={learner?.result_status}
-        />
-        <div className="hidden lg:block" />
-        <TextInput
-          label="GPA"
-          name="gpa"
-          type="number"
-          step="0.01"
-          defaultValue={learner?.gpa}
-        />
-        <TextInput
-          label="CGPA"
-          name="cgpa"
-          type="number"
-          step="0.01"
-          defaultValue={learner?.cgpa}
-        />
-        <div className="hidden lg:block" />
-        <DateInput
-          label="APEL Examination Board (AEB) Date"
-          name="apel_examination_board_date"
-          defaultValue={learner?.apel_examination_board_date}
-        />
+        <InstrumentResults learner={learner} />
         <DateInput
           label="Senate Date"
           name="senate_date"
@@ -380,6 +346,26 @@ export function LearnerForm({
         </FormSection>
       )}
 
+    </>
+  );
+}
+
+// The Add Learner form: fields plus a single submit, posting to createLearner.
+export function LearnerForm({
+  action,
+  submitLabel,
+  ...fields
+}: {
+  learner?: Learner;
+  advisors: Advisor[];
+  assessors: Assessor[];
+  action: (formData: FormData) => Promise<void>;
+  submitLabel: string;
+  showDocumentUpload?: boolean;
+}) {
+  return (
+    <form action={action} className="space-y-6">
+      <LearnerFormFields {...fields} />
       <div className="flex justify-end">
         <button
           type="submit"

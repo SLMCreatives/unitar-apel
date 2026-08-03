@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
+import { latestInstrumentResult } from "@/lib/instruments";
 import { ASSESSMENT_STAGES, LEARNER_STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +17,9 @@ type Row = {
   sponsor: string | null;
   advisor: string | null;
   registration_payment_status: string | null;
-  result_status: string | null;
   offer_letter_issued_date: string | null;
+  // Plus the per-instrument result columns, read via latestInstrumentResult.
+  [column: string]: unknown;
 };
 
 type NoteRow = {
@@ -92,7 +94,9 @@ export default async function DashboardPage() {
     supabase
       .from("apel")
       .select(
-        "id, name, learner_status, assessment_stage, sponsor, advisor, registration_payment_status, result_status, offer_letter_issued_date"
+        // Spelled out rather than built from ASSESSMENT_INSTRUMENTS because
+        // supabase-js types the select from the literal string.
+        "id, name, learner_status, assessment_stage, sponsor, advisor, registration_payment_status, offer_letter_issued_date, portfolio_result_status, fvv_result_status, challenge_test_result_status, capstone_result_status"
       ),
     supabase
       .from("apel_notes")
@@ -225,8 +229,10 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="mt-4 space-y-2.5">
-            <BarRow label="Pass" count={count((l) => l.result_status === "PASS")} total={learners.length} barClass="bg-green-500" />
-            <BarRow label="Fail" count={count((l) => l.result_status === "FAIL")} total={learners.length} barClass="bg-red-500" />
+            {/* Pass/fail follows the furthest instrument each learner has
+                been graded on. */}
+            <BarRow label="Pass" count={count((l) => latestInstrumentResult(l) === "PASS")} total={learners.length} barClass="bg-green-500" />
+            <BarRow label="Fail" count={count((l) => latestInstrumentResult(l) === "FAIL")} total={learners.length} barClass="bg-red-500" />
           </div>
         </section>
 

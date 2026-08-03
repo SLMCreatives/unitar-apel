@@ -10,9 +10,15 @@ import {
   documentStoragePath,
   validateDocument,
 } from "@/lib/documents";
+import { instrumentColumns } from "@/lib/instruments";
+import type { LearnerSaveState } from "@/lib/learner-save";
 import { ROLE_CONFIG, roleConfigForAssessorRole } from "@/lib/roles";
 import { type SectionKey } from "@/lib/permissions";
-import { PERSONNEL_ROLES, type PersonnelRole } from "@/lib/types";
+import {
+  ASSESSMENT_INSTRUMENTS,
+  PERSONNEL_ROLES,
+  type PersonnelRole,
+} from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -34,6 +40,20 @@ function num(fd: FormData, key: string): number | null {
   if (s === null) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
+}
+
+// One status/GPA/CGPA per assessment instrument, from the results grid in the
+// learner form. Built from ASSESSMENT_INSTRUMENTS so adding an instrument
+// there is the only change needed.
+function instrumentResultsPayload(fd: FormData) {
+  const payload: Record<string, string | number | null> = {};
+  for (const { prefix } of ASSESSMENT_INSTRUMENTS) {
+    const cols = instrumentColumns(prefix);
+    payload[cols.resultStatus] = str(fd, cols.resultStatus);
+    payload[cols.gpa] = num(fd, cols.gpa);
+    payload[cols.cgpa] = num(fd, cols.cgpa);
+  }
+  return payload;
 }
 
 function learnerPayload(fd: FormData) {
@@ -76,11 +96,11 @@ function learnerPayload(fd: FormData) {
     self_assessment_status: str(fd, "self_assessment_status"),
     self_assessment_date_completed: str(fd, "self_assessment_date_completed"),
     offer_letter_issued_date: str(fd, "offer_letter_issued_date"),
-    assessment_instrument_level: str(fd, "assessment_instrument_level"),
-    result_status: str(fd, "result_status"),
-    gpa: num(fd, "gpa"),
-    cgpa: num(fd, "cgpa"),
-    apel_examination_board_date: str(fd, "apel_examination_board_date"),
+    ...instrumentResultsPayload(fd),
+    // apel_examination_board_date is deliberately absent: the form no longer
+    // has that field, so including it here would write null on every save and
+    // wipe the AEB dates already recorded. The column keeps its history and
+    // stays available in Reports.
     senate_date: str(fd, "senate_date"),
     progress_remark: str(fd, "progress_remark"),
     // Milestones / claims
@@ -107,6 +127,10 @@ function assertRequired(payload: ReturnType<typeof learnerPayload>) {
 // ("column apel.external_links does not exist"). Name the migration instead.
 const COLUMN_MIGRATIONS: Record<string, string> = {
   external_links: "0005_learner_external_links.sql",
+  portfolio_result_status: "0006_instrument_results.sql",
+  fvv_result_status: "0006_instrument_results.sql",
+  challenge_test_result_status: "0006_instrument_results.sql",
+  capstone_result_status: "0006_instrument_results.sql",
 };
 
 function describeSaveError(message: string): string {
@@ -167,20 +191,44 @@ export async function createLearner(formData: FormData) {
   redirect(`/learners/${data.id}${docFailed ? "?doc_error=1" : ""}`);
 }
 
-export async function updateLearner(id: number, formData: FormData) {
+// The learner editor saves through this on an interval as fields change, as
+// well as on the explicit Save buttons. Failures come back as state rather
+// than thrown errors — an autosave must never throw the user into the error
+// boundary mid-edit and lose what they typed.
+export async function saveLearner(
+  id: number,
+  prev: LearnerSaveState,
+  formData: FormData
+): Promise<LearnerSaveState> {
+  // Outside the try: this may redirect, which throws a control-flow error that
+  // must not be swallowed as a save failure.
   await requirePermission("learners");
-  const payload = learnerPayload(formData);
-  assertRequired(payload);
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("apel").update(payload).eq("id", id);
-  if (error) throw new Error(describeSaveError(error.message));
+  try {
+    const payload = learnerPayload(formData);
+    assertRequired(payload);
 
-  await syncAssignments(supabase, id, payload);
+    const supabase = await createClient();
+    const { error } = await supabase.from("apel").update(payload).eq("id", id);
+    if (error) throw new Error(describeSaveError(error.message));
 
-  revalidatePath("/");
-  revalidatePath(`/learners/${id}`);
-  revalidatePath("/advisors");
+    await syncAssignments(supabase, id, payload);
+
+    // Deliberately not revalidating /learners/[id] itself: re-rendering the
+    // page the user is typing into on every autosave is needless churn. The
+    // page is force-dynamic, so it re-reads on the next visit anyway.
+    revalidatePath("/");
+    revalidatePath("/advisors");
+
+    return { status: "saved", message: null, savedAt: Date.now() };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "Could not save the learner.",
+      savedAt: prev.savedAt,
+    };
+  }
 }
 
 export async function deleteLearner(id: number) {
