@@ -191,10 +191,9 @@ export async function createLearner(formData: FormData) {
   redirect(`/learners/${data.id}${docFailed ? "?doc_error=1" : ""}`);
 }
 
-// The learner editor saves through this on an interval as fields change, as
-// well as on the explicit Save buttons. Failures come back as state rather
-// than thrown errors — an autosave must never throw the user into the error
-// boundary mid-edit and lose what they typed.
+// Backs the learner editor's Save buttons. Failures come back as state rather
+// than thrown errors, so a rejected save reports itself in the form instead of
+// throwing the user into the error boundary and losing what they typed.
 export async function saveLearner(
   id: number,
   prev: LearnerSaveState,
@@ -214,11 +213,11 @@ export async function saveLearner(
 
     await syncAssignments(supabase, id, payload);
 
-    // Deliberately not revalidating /learners/[id] itself: re-rendering the
-    // page the user is typing into on every autosave is needless churn. The
-    // page is force-dynamic, so it re-reads on the next visit anyway.
-    revalidatePath("/");
-    revalidatePath("/advisors");
+    // Saving is a deliberate click, so refresh everything rather than guessing
+    // which pages a change touched: this purges the client cache and
+    // invalidates every route, and re-renders this one into the same response
+    // so the fields come back showing exactly what was stored.
+    revalidatePath("/", "layout");
 
     return { status: "saved", message: null, savedAt: Date.now() };
   } catch (error) {
