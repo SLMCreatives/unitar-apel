@@ -75,18 +75,18 @@ export function ContactIcons({
           target="_blank"
           rel="noopener noreferrer"
           title={`WhatsApp ${phone}`}
-          className="rounded-md p-1.5 text-green-600 hover:bg-green-50"
+          className="rounded-md p-1 text-green-600 hover:bg-green-50"
         >
-          <WhatsAppIcon className="h-4 w-4" />
+          <WhatsAppIcon className="h-3.5 w-3.5" />
         </a>
       )}
       {email && (
         <a
           href={`mailto:${email}`}
           title={`Email ${email}`}
-          className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50"
+          className="rounded-md p-1 text-blue-600 hover:bg-blue-50"
         >
-          <MailIcon className="h-4 w-4" />
+          <MailIcon className="h-3.5 w-3.5" />
         </a>
       )}
     </div>

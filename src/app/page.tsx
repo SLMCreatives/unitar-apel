@@ -3,7 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth";
 import { StageBadge, StatusBadge } from "@/components/badges";
 import { ContactIcons } from "@/components/contact-buttons";
+import { LearnerFilters } from "@/components/learner-filters";
 import { OfferProgress } from "@/components/offer-progress";
+import {
+  Pagination,
+  parsePage,
+  parsePageSize,
+} from "@/components/pagination";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
 import {
   ASSESSMENT_STAGES,
@@ -16,197 +22,188 @@ export const dynamic = "force-dynamic";
 export default async function LearnersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; stage?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    stage?: string;
+    page?: string;
+    per?: string;
+  }>;
 }) {
   if (!envReady()) return <SetupNotice />;
   await requirePermission("learners");
 
-  const { q, status, stage } = await searchParams;
+  const { q, status, stage, page, per } = await searchParams;
   const supabase = await createClient();
 
-  let query = supabase
-    .from("apel")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const pageSize = parsePageSize(per);
 
+  // Described as data rather than a helper so the same filters can be applied
+  // to both the count and the row query without losing the builder's types.
+  const filters: (
+    | { kind: "or"; value: string }
+    | { kind: "eq"; column: string; value: string }
+  )[] = [];
   if (q) {
     const safe = q.replace(/[,()]/g, " ").trim();
     if (safe) {
-      query = query.or(
-        `name.ilike.%${safe}%,matric_no.ilike.%${safe}%,ic_passport_no.ilike.%${safe}%`
-      );
+      filters.push({
+        kind: "or",
+        value: `name.ilike.%${safe}%,matric_no.ilike.%${safe}%,ic_passport_no.ilike.%${safe}%`,
+      });
     }
   }
-  if (status) query = query.eq("learner_status", status);
-  if (stage) query = query.eq("assessment_stage", stage);
+  if (status) filters.push({ kind: "eq", column: "learner_status", value: status });
+  if (stage) filters.push({ kind: "eq", column: "assessment_stage", value: stage });
 
-  const { data, error } = await query;
+  // Counted first because PostgREST errors on a range past the last row, so
+  // the requested page has to be clamped before the rows are fetched.
+  let countQuery = supabase
+    .from("apel")
+    .select("id", { count: "exact", head: true });
+  for (const f of filters) {
+    countQuery =
+      f.kind === "or" ? countQuery.or(f.value) : countQuery.eq(f.column, f.value);
+  }
+  const countRes = await countQuery;
+  if (countRes.error) return <QueryError message={countRes.error.message} />;
+
+  const total = countRes.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(parsePage(page), totalPages);
+  const from = (currentPage - 1) * pageSize;
+
+  let rowsQuery = supabase
+    .from("apel")
+    .select("*")
+    .order("created_at", { ascending: false });
+  for (const f of filters) {
+    rowsQuery =
+      f.kind === "or" ? rowsQuery.or(f.value) : rowsQuery.eq(f.column, f.value);
+  }
+
+  const { data, error } = await rowsQuery.range(from, from + pageSize - 1);
   if (error) return <QueryError message={error.message} />;
   const learners = (data ?? []) as Learner[];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-gray-900">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-base font-bold text-gray-900">
           Learners{" "}
-          <span className="text-sm font-normal text-gray-500">
-            ({learners.length})
-          </span>
+          <span className="text-xs font-normal text-gray-500">({total})</span>
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/learners/new"
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
           >
             + Add learner
           </Link>
           <Link
             href="/learners/bulk"
-            className="rounded-md border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+            className="rounded-md border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
           >
             Bulk upload
           </Link>
         </div>
       </div>
 
-      <form className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-white p-3">
-        <div className="min-w-[14rem] flex-1">
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Search
-          </label>
-          <input
-            type="text"
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Name, matric no, or IC/passport…"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Status
-          </label>
-          <select
-            name="status"
-            defaultValue={status ?? ""}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">All</option>
-            {LEARNER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Stage
-          </label>
-          <select
-            name="stage"
-            defaultValue={stage ?? ""}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">All</option>
-            {ASSESSMENT_STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-        >
-          Filter
-        </button>
-        {(q || status || stage) && (
-          <Link
-            href="/"
-            className="px-2 py-2 text-sm text-gray-500 hover:text-gray-800"
-          >
-            Clear
-          </Link>
-        )}
-      </form>
+      <LearnerFilters
+        q={q ?? ""}
+        status={status ?? ""}
+        stage={stage ?? ""}
+        pageSize={pageSize}
+        statuses={LEARNER_STATUSES}
+        stages={ASSESSMENT_STAGES}
+      />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Programme</th>
-              <th className="px-4 py-3">Counsellor</th>
-              <th className="px-4 py-3">Advisor</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Stage</th>
-              <th className="px-4 py-3">Sponsor</th>
-              <th className="px-4 py-3">12-month window</th>
-              <th className="px-4 py-3">Contact</th>
-              <th className="px-4 py-3">Documents</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {learners.length === 0 && (
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-xs">
+            <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
               <tr>
-                <td
-                  colSpan={10}
-                  className="px-4 py-8 text-center text-gray-400"
-                >
-                  No learners found. Add your first learner to get started.
-                </td>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Programme</th>
+                <th className="px-3 py-2">Counsellor</th>
+                <th className="px-3 py-2">Advisor</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Stage</th>
+                <th className="px-3 py-2">Sponsor</th>
+                <th className="px-3 py-2">12-month window</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Documents</th>
               </tr>
-            )}
-            {learners.map((l) => (
-              <tr key={l.id} className="hover:bg-blue-50/40">
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/learners/${l.id}`}
-                    className="font-medium text-blue-700 hover:underline"
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {learners.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={10}
+                    className="px-3 py-8 text-center text-gray-400"
                   >
-                    {l.name}
-                  </Link>
-                  {l.matric_no && (
-                    <div className="text-xs text-gray-400">{l.matric_no}</div>
-                  )}
-                </td>
-                <td className="max-w-[14rem] truncate px-4 py-3 text-gray-600">
-                  {l.programme_details ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {l.assigned_counsellor ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-gray-600">{l.advisor ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge value={l.learner_status} />
-                </td>
-                <td className="px-4 py-3">
-                  <StageBadge value={l.assessment_stage} />
-                </td>
-                <td className="px-4 py-3 text-gray-600">{l.sponsor ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <OfferProgress issuedDate={l.offer_letter_issued_date} />
-                </td>
-                <td className="px-4 py-3">
-                  <ContactIcons
-                    phone={l.contact_no_1 ?? l.contact_no_2}
-                    email={l.email_1 ?? l.email_2}
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/learners/${l.id}#documents`}
-                    className="text-xs font-medium text-blue-600 hover:underline"
-                  >
-                    Upload
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    No learners found. Add your first learner to get started.
+                  </td>
+                </tr>
+              )}
+              {learners.map((l) => (
+                <tr key={l.id} className="hover:bg-blue-50/40">
+                  <td className="px-3 py-1.5">
+                    <Link
+                      href={`/learners/${l.id}`}
+                      className="font-medium text-blue-700 hover:underline"
+                    >
+                      {l.name}
+                    </Link>
+                    {l.matric_no && (
+                      <div className="text-[11px] text-gray-400">{l.matric_no}</div>
+                    )}
+                  </td>
+                  <td className="max-w-[14rem] truncate px-3 py-1.5 text-gray-600">
+                    {l.programme_details ?? "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-600">
+                    {l.assigned_counsellor ?? "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-600">{l.advisor ?? "—"}</td>
+                  <td className="px-3 py-1.5">
+                    <StatusBadge value={l.learner_status} />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <StageBadge value={l.assessment_stage} />
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-600">{l.sponsor ?? "—"}</td>
+                  <td className="px-3 py-1.5">
+                    <OfferProgress issuedDate={l.offer_letter_issued_date} />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <ContactIcons
+                      phone={l.contact_no_1 ?? l.contact_no_2}
+                      email={l.email_1 ?? l.email_2}
+                    />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <Link
+                      href={`/learners/${l.id}#documents`}
+                      className="text-[11px] font-medium text-blue-600 hover:underline"
+                    >
+                      Upload
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {total > 0 && (
+          <Pagination
+            basePath="/"
+            params={{ q, status, stage }}
+            page={currentPage}
+            pageSize={pageSize}
+            total={total}
+          />
+        )}
       </div>
     </div>
   );
