@@ -16,6 +16,7 @@ import { NotesPanel } from "@/components/notes-panel";
 import { OfferProgress } from "@/components/offer-progress";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
 import { requirePermission } from "@/lib/auth";
+import { leadAge } from "@/lib/lead-ageing";
 import { ROLE_CONFIG } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -72,6 +73,7 @@ export default async function LearnerDetailPage({
   if (!learnerRes.data) notFound();
 
   const learner = learnerRes.data as Learner;
+  const age = leadAge(learner.created_at, learner.updated_at);
   const notes = (notesRes.data ?? []) as LearnerNote[];
   const notesTableMissing = Boolean(notesRes.error);
 
@@ -120,6 +122,12 @@ export default async function LearnerDetailPage({
               </div>
             )}
           </div>
+          {age && (
+            <p className="mt-2 text-xs text-gray-500">
+              Lead age {age.ageDays} days at last update · last updated{" "}
+              {age.idleDays === 0 ? "today" : `${age.idleDays} days ago`}
+            </p>
+          )}
           <div className="mt-3">
             <ContactButtons
               phone={learner.contact_no_1 ?? learner.contact_no_2}

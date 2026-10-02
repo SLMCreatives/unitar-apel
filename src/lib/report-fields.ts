@@ -82,4 +82,5 @@ export const REPORT_FIELDS: ReportField[] = [
   { key: "capstone_date", label: "Capstone Date" },
   { key: "claim_submission_2_amount", label: "Claim Submission 2 (RM)" },
   { key: "created_at", label: "Record Created At" },
+  { key: "updated_at", label: "Record Last Updated At" },
 ];

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth";
 import { StageBadge, StatusBadge } from "@/components/badges";
 import { ContactIcons } from "@/components/contact-buttons";
+import { LeadAge } from "@/components/lead-age";
 import { LearnerFilters } from "@/components/learner-filters";
 import { OfferProgress } from "@/components/offer-progress";
 import {
@@ -131,6 +132,7 @@ export default async function LearnersPage({
                 <th className="px-3 py-2">Stage</th>
                 <th className="px-3 py-2">Sponsor</th>
                 <th className="px-3 py-2">12-month window</th>
+                <th className="px-3 py-2">Lead age</th>
                 <th className="px-3 py-2">Contact</th>
                 <th className="px-3 py-2">Documents</th>
               </tr>
@@ -139,7 +141,7 @@ export default async function LearnersPage({
               {learners.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="px-3 py-8 text-center text-gray-400"
                   >
                     No learners found. Add your first learner to get started.
@@ -175,6 +177,9 @@ export default async function LearnersPage({
                   <td className="px-3 py-1.5 text-gray-600">{l.sponsor ?? "—"}</td>
                   <td className="px-3 py-1.5">
                     <OfferProgress issuedDate={l.offer_letter_issued_date} />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <LeadAge createdAt={l.created_at} updatedAt={l.updated_at} />
                   </td>
                   <td className="px-3 py-1.5">
                     <ContactIcons

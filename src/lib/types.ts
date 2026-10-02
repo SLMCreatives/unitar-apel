@@ -121,6 +121,9 @@ export type Assessor = {
 export type Learner = {
   id: number;
   created_at: string;
+  // Added by migration 0007 and absent until it runs. Moves on any real change
+  // to the learner or its notes, assignments or documents — drives lead ageing.
+  updated_at?: string;
   // Learner details information
   name: string;
   assigned_counsellor: string | null;

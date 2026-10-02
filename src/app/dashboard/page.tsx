@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
 import { latestInstrumentResult } from "@/lib/instruments";
+import { AGE_BUCKETS, ageBucket, leadAge } from "@/lib/lead-ageing";
 import { ASSESSMENT_STAGES, LEARNER_STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export default async function DashboardPage() {
   await requirePermission("dashboard");
 
   const supabase = await createClient();
-  const [learnersRes, notesRes] = await Promise.all([
+  const [learnersRes, notesRes, ageingRes] = await Promise.all([
     supabase
       .from("apel")
       .select(
@@ -103,6 +104,9 @@ export default async function DashboardPage() {
       .select("id, learner_id, body, follow_up_date")
       .not("follow_up_date", "is", null)
       .order("follow_up_date"),
+    // Separate from the main query so the dashboard still loads before
+    // migration 0007 adds updated_at — only the ageing section is affected.
+    supabase.from("apel").select("id, created_at, updated_at"),
   ]);
 
   if (learnersRes.error)
@@ -133,6 +137,24 @@ export default async function DashboardPage() {
     else if (months >= 9) nearing++;
     else onTrack++;
   }
+
+  // Lead ageing — in-progress learners, created → last update
+  const ageingMissing = Boolean(ageingRes.error);
+  const inProgressIds = new Set(inProgress.map((l) => l.id));
+  const aged = (ageingRes.data ?? []).flatMap((r) => {
+    if (!inProgressIds.has(r.id)) return [];
+    const age = leadAge(r.created_at, r.updated_at, now);
+    return age ? [{ id: r.id, ...age }] : [];
+  });
+  const ageBucketCounts = new Map<string, number>();
+  for (const a of aged) {
+    const { label } = ageBucket(a.ageDays);
+    ageBucketCounts.set(label, (ageBucketCounts.get(label) ?? 0) + 1);
+  }
+  const oldestLeads = [...aged]
+    .sort((a, b) => b.ageDays - a.ageDays)
+    .slice(0, 5);
+  const medianAge = median(aged.map((a) => a.ageDays));
 
   // Follow-ups
   const today = new Date().toISOString().slice(0, 10);
@@ -236,6 +258,68 @@ export default async function DashboardPage() {
           </div>
         </section>
 
+        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            Lead Ageing{" "}
+            <span className="font-normal normal-case text-gray-400">
+              (in-progress learners — time in system at last update)
+            </span>
+          </h2>
+          {ageingMissing ? (
+            <p className="text-sm text-gray-400">
+              Run migration 0007_learner_updated_at.sql to start tracking when
+              learners were last updated.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="space-y-2.5">
+                {AGE_BUCKETS.map((b) => (
+                  <BarRow
+                    key={b.label}
+                    label={b.label}
+                    count={ageBucketCounts.get(b.label) ?? 0}
+                    total={aged.length}
+                    barClass={b.barClass}
+                  />
+                ))}
+                <p className="pt-1 text-xs text-gray-500">
+                  Median lead age:{" "}
+                  <span className="font-semibold text-gray-700">
+                    {medianAge === null ? "—" : `${medianAge} days`}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-semibold text-gray-600">
+                  Oldest leads
+                </p>
+                {oldestLeads.length === 0 ? (
+                  <p className="text-sm text-gray-400">No in-progress learners.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {oldestLeads.map((a) => (
+                      <li key={a.id} className="flex items-center gap-2 py-1.5 text-sm">
+                        <span className="w-16 shrink-0 text-xs font-semibold text-gray-700">
+                          {a.ageDays}d
+                        </span>
+                        <Link
+                          href={`/learners/${a.id}`}
+                          className="truncate font-medium text-blue-700 hover:underline"
+                        >
+                          {nameById.get(a.id) ?? `#${a.id}`}
+                        </Link>
+                        <span className="ml-auto shrink-0 text-xs text-gray-400">
+                          updated {a.idleDays === 0 ? "today" : `${a.idleDays}d ago`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
         <BarList
           title="Learner Status"
           items={LEARNER_STATUSES.map((s) => ({
@@ -290,6 +374,15 @@ export default async function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
 function BarRow({
