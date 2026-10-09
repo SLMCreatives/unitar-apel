@@ -36,6 +36,14 @@ export async function AppHeader() {
                 {link.label}
               </Link>
             ))}
+            {/* The guide is read-only help for every active user, so it is not
+                a permission section and needs no role grant. */}
+            <Link
+              href="/guide"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              Guide
+            </Link>
             {/* Admin only manages accounts/roles, so it is pointless while
                 auth is off (src/lib/auth-config.ts). */}
             {AUTH_ENABLED && user?.isSuperadmin && (
