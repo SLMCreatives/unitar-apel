@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
-import { syncAssignments } from "@/lib/assignments";
+import {
+  ASSIGNMENT_SOURCE_COLUMNS,
+  syncAssignments,
+  type AssignmentSource,
+} from "@/lib/assignments";
 import { createClient } from "@/lib/supabase/server";
 import {
   DOCUMENTS_BUCKET,
@@ -208,10 +212,19 @@ export async function saveLearner(
     assertRequired(payload);
 
     const supabase = await createClient();
+    // The learner as it was, so only Assessor Details that actually changed
+    // are copied onto assignments.
+    const before = await supabase
+      .from("apel")
+      .select(ASSIGNMENT_SOURCE_COLUMNS)
+      .eq("id", id)
+      .maybeSingle();
+    const previous = (before.data ?? null) as AssignmentSource | null;
+
     const { error } = await supabase.from("apel").update(payload).eq("id", id);
     if (error) throw new Error(describeSaveError(error.message));
 
-    await syncAssignments(supabase, id, payload);
+    await syncAssignments(supabase, id, payload, previous);
 
     // Saving is a deliberate click, so refresh everything rather than guessing
     // which pages a change touched: this purges the client cache and
@@ -281,6 +294,31 @@ export async function deleteNote(noteId: number, learnerId: number) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/learners/${learnerId}`);
+}
+
+// Closes (or reopens) a note's follow-up. The note and its date are kept, so
+// the history stays; the Dashboard stops listing it.
+export async function setFollowUpDone(
+  noteId: number,
+  learnerId: number,
+  done: boolean
+) {
+  await requirePermission("learners");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("apel_notes")
+    .update({ follow_up_done_at: done ? new Date().toISOString() : null })
+    .eq("id", noteId);
+  if (error) {
+    throw new Error(
+      error.message.includes("follow_up_done_at")
+        ? `${error.message} — run supabase/migrations/0008_note_follow_up_done.sql in the Supabase SQL Editor.`
+        : error.message
+    );
+  }
+
+  revalidatePath(`/learners/${learnerId}`);
+  revalidatePath("/dashboard");
 }
 
 // --- Advisors ----------------------------------------------------------------
@@ -430,12 +468,30 @@ export async function addAssignment(formData: FormData) {
   assertClaimAllowed(role, payload);
 
   const supabase = await createClient();
-  const { error } = await supabase.from("apel_assignments").insert({
-    learner_id: learnerId,
-    personnel_name: personnelName,
-    role,
-    ...payload,
-  });
+
+  // A learner has at most one assignment per role and stage (unique index in
+  // migration 0002). Adding one that already exists updates it rather than
+  // failing on the index.
+  let lookup = supabase
+    .from("apel_assignments")
+    .select("id")
+    .eq("learner_id", learnerId)
+    .eq("role", role);
+  lookup = payload.stage ? lookup.eq("stage", payload.stage) : lookup.is("stage", null);
+  const existing = await lookup.maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+
+  const { error } = existing.data
+    ? await supabase
+        .from("apel_assignments")
+        .update({ personnel_name: personnelName, ...payload })
+        .eq("id", existing.data.id)
+    : await supabase.from("apel_assignments").insert({
+        learner_id: learnerId,
+        personnel_name: personnelName,
+        role,
+        ...payload,
+      });
   if (error) throw new Error(error.message);
 
   revalidateAssignmentPages(role, learnerId);

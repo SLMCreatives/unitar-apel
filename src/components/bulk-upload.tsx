@@ -105,7 +105,9 @@ export function BulkUpload() {
               </option>
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              Matched on {columnLabel("ic_passport_no")}.
+              Matched on {columnLabel("ic_passport_no")}. An update writes only
+              the filled-in cells — blank cells and missing columns keep the
+              learner&apos;s current values.
             </p>
           </div>
         </div>

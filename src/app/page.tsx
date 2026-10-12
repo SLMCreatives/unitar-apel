@@ -176,7 +176,11 @@ export default async function LearnersPage({
                   </td>
                   <td className="px-3 py-1.5 text-gray-600">{l.sponsor ?? "—"}</td>
                   <td className="px-3 py-1.5">
-                    <OfferProgress issuedDate={l.offer_letter_issued_date} />
+                    <OfferProgress
+                      issuedDate={l.offer_letter_issued_date}
+                      stage={l.assessment_stage}
+                      status={l.learner_status}
+                    />
                   </td>
                   <td className="px-3 py-1.5">
                     <LeadAge createdAt={l.created_at} updatedAt={l.updated_at} />

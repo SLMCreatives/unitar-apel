@@ -30,20 +30,28 @@ export async function GET() {
   header.height = 30;
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 
-  // One example row so the expected formats are obvious. Delete before import
-  // — or leave it: the row is only a sample, so it imports as a learner.
-  sheet.addRow({
-    name: "Nurul binti Ahmad",
-    matric_no: "APEL2026001",
-    ic_passport_no: "900101-14-5678",
+  // The example row lives on its own sheet. The importer reads only the first
+  // sheet (src/lib/bulk-parse.ts), so a forgotten example can never be imported
+  // as a learner — and it is plainly a dummy, not a real-looking person.
+  const example = workbook.addWorksheet("Example (not imported)");
+  example.columns = sheet.columns.map((c) => ({
+    header: c.header,
+    key: c.key,
+    width: c.width,
+  }));
+  example.getRow(1).font = { bold: true };
+  example.addRow({
+    name: "TEST LEARNER",
+    matric_no: "TEST0001",
+    ic_passport_no: "000000-00-0000",
     nationality: "Malaysia",
-    contact_no_1: "0123456789",
-    email_1: "nurul@example.com",
-    company_details: "Contoh Sdn Bhd",
+    contact_no_1: "0000000000",
+    email_1: "test.learner@example.com",
+    company_details: "Example Sdn Bhd",
     position_title: "Operations Executive",
     external_links: "Portfolio | https://drive.google.com/drive/folders/example",
-    programme_details: "Bachelor of Management",
-    assigned_counsellor: "Siti",
+    programme_details: "Example programme",
+    assigned_counsellor: "Example counsellor",
     learner_status: "ACTIVE",
     sponsor: "OPEN",
     assessment_stage: "PORTFOLIO",
@@ -80,7 +88,7 @@ export async function GET() {
   reference.addRow({});
   reference.addRow({
     column: "Note",
-    values: `Required columns: ${REQUIRED_IMPORT_FIELDS.map((f) => f.label).join(", ")}. Header names are matched loosely, so case and punctuation don't matter. Extra columns are ignored.`,
+    values: `Required columns: ${REQUIRED_IMPORT_FIELDS.map((f) => f.label).join(", ")}. Header names are matched loosely, so case and punctuation don't matter. Extra columns are ignored. Only the first sheet (Learners) is imported — the Example sheet is for reference.`,
   });
 
   const buffer = await workbook.xlsx.writeBuffer();

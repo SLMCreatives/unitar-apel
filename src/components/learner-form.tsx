@@ -255,7 +255,11 @@ export function LearnerFormFields({
           />
           {learner?.offer_letter_issued_date && (
             <div className="mt-2">
-              <OfferProgress issuedDate={learner.offer_letter_issued_date} />
+              <OfferProgress
+                issuedDate={learner.offer_letter_issued_date}
+                stage={learner.assessment_stage}
+                status={learner.learner_status}
+              />
             </div>
           )}
         </div>

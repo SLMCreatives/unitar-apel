@@ -515,9 +515,8 @@ export default async function GuidePage() {
               <p>
                 Click <Btn>Save changes</Btn>. Saving creates the advisor’s
                 assignment for the <StageBadge value="SELF ASSESSMENT" /> stage
-                for you. <strong>Don’t add it again</strong> on the Advisors
-                page — that makes a duplicate. Instead, open the new assignment
-                and fill in its details. See{" "}
+                for you, so you don’t need to add it on the Advisors page.
+                Open the new assignment and fill in its details. See{" "}
                 <a href="#assign-personnel" className="text-blue-600 hover:underline">
                   Assign advisors, assessors and moderators
                 </a>
@@ -658,21 +657,21 @@ export default async function GuidePage() {
                 </Step>
               </Steps>
 
-              <Callout tone="info" title="Who the Dashboard counts">
+              <Callout tone="info" title="When the window stops">
                 <p>
-                  <UI>12-Month Window Health</UI> and <UI>Window overdue</UI>{" "}
-                  count only in-progress learners: anyone whose{" "}
-                  <UI>Assessment Stage</UI> is <em>not</em>{" "}
+                  The window is tracked only while a learner is in progress.
+                  It stops when their <UI>Assessment Stage</UI> is{" "}
                   <StageBadge value="COMPLETED" /> or{" "}
-                  <StageBadge value="GRADUATED" />. That includes learners with
-                  a blank stage, and learners whose <UI>Learner Status</UI> is{" "}
-                  <StatusBadge value="WITHDRAW" /> or{" "}
-                  <StatusBadge value="INACTIVE" />.
+                  <StageBadge value="GRADUATED" />, or their{" "}
+                  <UI>Learner Status</UI> is <StatusBadge value="WITHDRAW" />.
+                  The meter then shows <span className="text-xs text-gray-400">Closed</span>,
+                  and the learner leaves 12-Month Window Health and Window
+                  overdue.
                 </p>
                 <p>
-                  The meter in the Learners list and on the record keeps running
-                  even after a learner completes. Ignore it for completed and
-                  graduated learners.
+                  Learners with a blank stage, and learners set to{" "}
+                  <StatusBadge value="INACTIVE" /> or{" "}
+                  <StatusBadge value="PENDING" />, are still counted.
                 </p>
               </Callout>
               <ToConfirm>
@@ -681,8 +680,8 @@ export default async function GuidePage() {
                   when a learner goes over.
                 </p>
                 <p>
-                  Whether withdrawn learners should count in 12-Month Window
-                  Health. At the moment they do.
+                  Whether <StatusBadge value="INACTIVE" /> learners should also
+                  stop the window. At the moment they don’t.
                 </p>
               </ToConfirm>
             </SubSection>
@@ -812,8 +811,8 @@ export default async function GuidePage() {
               <p>
                 Once the stage is <StageBadge value="COMPLETED" /> or{" "}
                 <StageBadge value="GRADUATED" />, the learner counts in{" "}
-                <UI>Completed / Graduated</UI> and drops out of 12-Month Window
-                Health and Lead Ageing.
+                <UI>Completed / Graduated</UI>, drops out of 12-Month Window
+                Health and Lead Ageing, and their meter shows Closed.
               </p>
               <ToConfirm>
                 <p>
@@ -838,10 +837,10 @@ export default async function GuidePage() {
                 disappears from every report.
               </p>
               <p>
-                A withdrawn learner still counts in 12-Month Window Health and
-                Lead Ageing unless their <UI>Assessment Stage</UI> is{" "}
-                <StageBadge value="COMPLETED" /> or{" "}
-                <StageBadge value="GRADUATED" />.
+                Once set to <StatusBadge value="WITHDRAW" />, the learner leaves
+                12-Month Window Health and Lead Ageing, and their meter shows
+                Closed. They still count in <UI>Total learners</UI>, the
+                Pipeline and Advisor Load.
               </p>
               <ToConfirm>
                 <p>
@@ -901,13 +900,11 @@ export default async function GuidePage() {
                   click <Btn>Bulk upload</Btn>.
                 </Step>
                 <Step>
-                  Click <UI>Download template</UI>. It has one column per field,
-                  and an <UI>Accepted values</UI> sheet.
-                </Step>
-                <Step>
-                  <strong>Delete the example row</strong> in the template. It’s
-                  sample data, and it will be imported as a real learner if you
-                  leave it.
+                  Click <UI>Download template</UI>. Fill in the first sheet,{" "}
+                  <UI>Learners</UI>. The <UI>Example (not imported)</UI> sheet
+                  shows a filled-in TEST LEARNER row, and{" "}
+                  <UI>Accepted values</UI> lists what each column takes. Only
+                  the first sheet is imported.
                 </Step>
                 <Step>
                   Enter one learner per row. These columns are required:{" "}
@@ -944,17 +941,17 @@ export default async function GuidePage() {
                 </Step>
               </Steps>
 
-              <Callout tone="warning" title="Careful with “Update the existing learner”">
+              <Callout tone="info" title="What “Update the existing learner” changes">
                 <p>
-                  An update replaces <strong>every</strong> field of the
-                  matched learner. Any column that is blank — or missing from
-                  your file — is cleared on that learner, including dates,
-                  assessors and results.
+                  Only the cells you fill in. Blank cells, and columns that
+                  aren’t in your file, keep the learner’s current values. So a
+                  file with just Name, IC / Passport No, Email Address 1 and
+                  Offer Letter Issued Date updates only the offer letter date
+                  (and the three required fields).
                 </p>
                 <p>
-                  Use <Val>Skip the row (safest)</Val> unless your file has
-                  every column filled in for those learners. To change one or two
-                  fields, edit the learner record instead.
+                  A bulk upload can’t empty a field. To clear one, edit the
+                  learner record.
                 </p>
               </Callout>
 
@@ -1004,7 +1001,8 @@ export default async function GuidePage() {
                       </td>
                       <td className="px-3 py-2 text-gray-700">
                         The person’s name spelled exactly as in the Advisors or
-                        Assessors &amp; Moderators list. See{" "}
+                        Assessors &amp; Moderators list. Other spellings are
+                        saved, but show as “(not in list)”. See{" "}
                         <a href="#add-personnel" className="text-blue-600 hover:underline">why</a>.
                       </td>
                     </tr>
@@ -1141,12 +1139,19 @@ export default async function GuidePage() {
 
               <Callout tone="info" title="How the two places sync — one way only">
                 <p>
-                  When you save a learner, each name in Assessor Details is
-                  copied into an assignment for the learner’s current{" "}
-                  <UI>Assessment Stage</UI>, with its appointment date. If that
-                  person’s role already has an assignment for that stage, it is
-                  updated; if not, a new one is created. Bulk upload does the
-                  same.
+                  When you save a learner and you’ve changed a name, an
+                  appointment date or the <UI>Assessment Stage</UI>, the
+                  Assessor Details are copied into an assignment for the
+                  learner’s current stage. If that role already has an
+                  assignment for that stage, it is updated; if not, a new one is
+                  created. Bulk upload does the same.
+                </p>
+                <p>
+                  Saving without changing those fields leaves assignments
+                  alone, so details you edited on an assignment stay put. An
+                  assignment’s appointment date is only replaced when you change
+                  the date in Assessor Details, or when the assignment has no
+                  date yet.
                 </p>
                 <p>
                   It never works the other way. Adding or editing an assignment
@@ -1191,12 +1196,12 @@ export default async function GuidePage() {
                 </Step>
               </Steps>
 
-              <Callout tone="warning" title="Keep the appointment date in Assessor Details">
+              <Callout tone="tip" title="Which date goes where">
                 <p>
-                  Every time you save the learner, the appointment date in
-                  Assessor Details is copied onto the current stage’s
-                  assignment — even if it’s blank. If you change the date only
-                  on the assignment, the next save of the learner overwrites it.
+                  Keep the person’s appointment date in Assessor Details. If a
+                  later stage has a different appointment date, change it on
+                  that stage’s assignment — it won’t be overwritten unless you
+                  change the Assessor Details date again.
                 </p>
               </Callout>
 
@@ -1208,10 +1213,11 @@ export default async function GuidePage() {
                   <UI>Stage</UI>, <UI>Appointment Date</UI>,{" "}
                   <UI>Appointment Letter Status</UI>, <UI>Payment Mode</UI>,{" "}
                   <UI>Claim Status</UI>, <UI>Remarks</UI>, then{" "}
-                  <Btn>Add assignment</Btn>). Use it only for an assignment
-                  that isn’t the learner’s current one — for example, an earlier
-                  stage that was never recorded. Adding one for the current
-                  stage makes a duplicate.
+                  <Btn>Add assignment</Btn>). Use it for an assignment that
+                  isn’t the learner’s current one — for example, an earlier
+                  stage that was never recorded. A learner has at most one
+                  assignment per role and stage: if one already exists, it is
+                  updated with what you enter instead of being duplicated.
                 </p>
                 <p>
                   <strong>Moderators</strong> are not paid through this
@@ -1219,9 +1225,10 @@ export default async function GuidePage() {
                   Status.
                 </p>
                 <p>
-                  On the role pages, <UI>Learners assigned</UI> counts
-                  assignments, not people. A learner assigned to the same
-                  advisor for three stages counts as 3.
+                  On the role pages, <UI>Learners assigned</UI> counts each
+                  learner once. <UI>Assignments</UI> counts every stage, so a
+                  learner with the same advisor for three stages is 1 learner
+                  and 3 assignments.
                 </p>
                 <p>
                   <UI>Remove</UI> on an assignment deletes it and its
@@ -1278,11 +1285,11 @@ export default async function GuidePage() {
                   name on every learner and assignment.
                 </p>
                 <p>
-                  If a learner’s saved name isn’t on the list, their dropdown
-                  shows <Val>— Not assigned —</Val>, and saving that learner{" "}
-                  <strong>clears the name</strong>. Before you save, check the
-                  Assessor Details dropdowns still show the right people. The
-                  same applies to <UI>Nationality</UI>.
+                  When a learner’s saved name isn’t on the list, their dropdown
+                  shows it with <Val>(not in list)</Val> after it. The name is
+                  kept when you save. To tidy it up, add the person to the list
+                  or pick the right person from the dropdown. The same applies
+                  to <UI>Nationality</UI>.
                 </p>
               </Callout>
 
@@ -1385,26 +1392,26 @@ https://unitar.sharepoint.com/sites/apel/…`}
                 </Step>
                 <Step>Type <UI>Your name</UI>.</Step>
                 <Step>Click <Btn>Add note</Btn>.</Step>
+                <Step>
+                  When you’ve done the follow-up, click <UI>Mark done</UI> on
+                  the note. It shows <UI>✓ Follow-up done</UI> and leaves the
+                  Dashboard. Click <UI>Reopen</UI> if you marked it by mistake.
+                </Step>
               </Steps>
               <Callout tone="info" title="How follow-ups reach the Dashboard">
                 <p>
                   The Dashboard reads only the <UI>Follow-up date</UI> field.
                   There is no special wording to type in the note itself. Any
-                  note with a Follow-up date appears in the Dashboard’s{" "}
-                  <UI>Follow-ups</UI> panel: under <UI>⚠ Overdue</UI> once the
-                  date has passed, or under <UI>Upcoming</UI> (the next 8).
+                  note with a Follow-up date that isn’t marked done appears in
+                  the Dashboard’s <UI>Follow-ups</UI> panel: under{" "}
+                  <UI>⚠ Overdue</UI> once the date has passed, or under{" "}
+                  <UI>Upcoming</UI> (the next 8).
                 </p>
                 <p>
-                  Notes can’t be edited, and there is no “done” button. A
-                  follow-up stays on the Dashboard until its note is deleted.
+                  Notes can’t be edited. Use Mark done rather than Delete, so
+                  the record of what happened stays on the learner.
                 </p>
               </Callout>
-              <ToConfirm>
-                <p>
-                  How the team should close a follow-up once it’s done
-                  (deleting the note also deletes its history).
-                </p>
-              </ToConfirm>
             </SubSection>
 
             <SubSection id="dashboard" title="Read the Dashboard">
@@ -1432,7 +1439,7 @@ https://unitar.sharepoint.com/sites/apel/…`}
                     ["Learner Status", "How many learners have each status.", "Learner Status"],
                     ["Sponsor", "How many learners have each sponsor.", "Sponsor"],
                     ["Advisor Load", "How many learners each advisor has. Counts every learner, including completed and withdrawn.", "Advisor (in Assessor Details) — not assignments"],
-                    ["Follow-ups", "Overdue follow-ups, then the next 8 upcoming.", "Follow-up date on notes"],
+                    ["Follow-ups", "Overdue follow-ups, then the next 8 upcoming. Follow-ups marked done aren’t shown.", "Follow-up date on notes"],
                   ].map(([panel, what, fields]) => (
                     <div key={panel} className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,12rem)] sm:gap-4">
                       <dt className="text-sm font-semibold text-gray-900">{panel}</dt>
@@ -1447,8 +1454,8 @@ https://unitar.sharepoint.com/sites/apel/…`}
               </div>
               <p className="text-xs text-gray-500">
                 “In-progress” means any learner whose Assessment Stage is not
-                COMPLETED or GRADUATED — including blank stages and withdrawn
-                learners.
+                COMPLETED or GRADUATED and whose Learner Status is not WITHDRAW
+                — including learners with a blank stage.
               </p>
             </SubSection>
 
@@ -1544,7 +1551,8 @@ https://unitar.sharepoint.com/sites/apel/…`}
                 <CheckItem title="Follow-ups">
                   <p>
                     Deal with everything under <UI>⚠ Overdue</UI> first, then
-                    look at <UI>Upcoming</UI>.
+                    look at <UI>Upcoming</UI>. Click <UI>Mark done</UI> on each
+                    note once it’s handled.
                   </p>
                 </CheckItem>
                 <CheckItem title="Learners with no stage">
@@ -1585,7 +1593,7 @@ https://unitar.sharepoint.com/sites/apel/…`}
                 },
                 {
                   mistake: "Assessor recorded in only one of the two places",
-                  effect: "Added only through + Add assignment: Assessor Details stays blank, so the Learners list, Advisor Load and Reports don’t show them. Changed only on the assignment: the next learner save overwrites the appointment date.",
+                  effect: "Added only through + Add assignment: Assessor Details stays blank, so the Learners list, Advisor Load and Reports don’t show them.",
                   fix: "Always start in Assessor Details on the learner record and save. Then edit the assignment it creates.",
                 },
                 {
@@ -1604,19 +1612,19 @@ https://unitar.sharepoint.com/sites/apel/…`}
                   fix: "“Leave a row blank until that instrument has been assessed.”",
                 },
                 {
-                  mistake: "Bulk upload with “Update the existing learner” and a partial file",
-                  effect: "Every field that’s blank or missing in the file is cleared on the matched learners.",
-                  fix: "Use “Skip the row (safest)”, or edit the learner record directly.",
-                },
-                {
                   mistake: "Leaving the page without saving",
                   effect: "Your changes are lost.",
                   fix: "Click Save changes and wait for “Saved”.",
                 },
                 {
-                  mistake: "Saving a learner whose advisor or assessor isn’t on the list",
-                  effect: "The dropdown shows — Not assigned —, and saving clears the name.",
-                  fix: "Add the person to the list first, then save.",
+                  mistake: "Names that don’t match the lists",
+                  effect: "An advisor or assessor typed differently (often in bulk upload) shows as “(not in list)” on the learner and gets a separate heading on the role page.",
+                  fix: "Add the person to the list with that spelling, or pick the right person on the learner and save.",
+                },
+                {
+                  mistake: "Deleting a note to clear a follow-up",
+                  effect: "The record of what was done is lost.",
+                  fix: "Click Mark done instead.",
                 },
               ].map((m) => (
                 <div key={m.mistake} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">

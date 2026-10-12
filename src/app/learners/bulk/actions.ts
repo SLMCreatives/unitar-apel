@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { syncAssignments } from "@/lib/assignments";
+import {
+  ASSIGNMENT_SOURCE_COLUMNS,
+  syncAssignments,
+  type AssignmentSource,
+} from "@/lib/assignments";
 import { requirePermission } from "@/lib/auth";
 import {
   EMPTY_COMMIT,
@@ -252,25 +256,39 @@ export async function commitBulkUpload(
     if (key && seen.has(key)) continue; // duplicate inside the same submission
     if (key) seen.add(key);
 
-    const payload = toLearnerPayload(clean);
     const existingId = key ? existing.get(key) : undefined;
 
     if (existingId !== undefined) {
       if (mode !== "UPDATE_EXISTING") continue;
-      const { error } = await supabase
+      const before = await supabase
         .from("apel")
-        .update(payload)
-        .eq("id", existingId);
+        .select(ASSIGNMENT_SOURCE_COLUMNS)
+        .eq("id", existingId)
+        .maybeSingle();
+      // Returns the learner as saved — the update only touches the filled-in
+      // cells, so the file alone doesn't say what the assessors now are.
+      const { data: after, error } = await supabase
+        .from("apel")
+        .update(toUpdatePayload(clean))
+        .eq("id", existingId)
+        .select(ASSIGNMENT_SOURCE_COLUMNS)
+        .single();
       if (error) {
         failures.push({ rowNumber, message: error.message });
         continue;
       }
-      await syncAssignments(supabase, existingId, payload);
+      await syncAssignments(
+        supabase,
+        existingId,
+        after as unknown as AssignmentSource,
+        (before.data ?? null) as AssignmentSource | null
+      );
       updated++;
       revalidatePath(`/learners/${existingId}`);
       continue;
     }
 
+    const payload = toLearnerPayload(clean);
     const { data, error } = await supabase
       .from("apel")
       .insert(payload)
@@ -301,12 +319,25 @@ export async function commitBulkUpload(
   };
 }
 
-// Only the known learner columns reach the database, and every importable
-// column is written — a blank cell clears the field on an update.
+// A new learner: only the known learner columns reach the database, with
+// anything absent from the file left empty.
 function toLearnerPayload(values: Record<string, ImportValue>) {
   const payload: Record<string, ImportValue> = {};
   for (const field of LEARNER_IMPORT_FIELDS) {
     payload[field.key] = values[field.key] ?? null;
+  }
+  return payload;
+}
+
+// An existing learner: only the cells that are filled in are written. Blank
+// cells and columns missing from the file keep the learner's current values,
+// so a sheet with a few columns can't wipe the rest of the record. Clearing a
+// field is done on the learner record instead.
+function toUpdatePayload(values: Record<string, ImportValue>) {
+  const payload: Record<string, ImportValue> = {};
+  for (const field of LEARNER_IMPORT_FIELDS) {
+    const value = values[field.key];
+    if (value !== null && value !== undefined) payload[field.key] = value;
   }
   return payload;
 }

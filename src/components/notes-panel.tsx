@@ -1,4 +1,4 @@
-import { addNote, deleteNote } from "@/app/actions";
+import { addNote, deleteNote, setFollowUpDone } from "@/app/actions";
 import { ConfirmButton } from "@/components/confirm-button";
 import type { LearnerNote } from "@/lib/types";
 
@@ -88,8 +88,11 @@ export function NotesPanel({
       ) : (
         <ul className="space-y-3">
           {notes.map((note) => {
+            const done = Boolean(note.follow_up_done_at);
             const overdue =
-              note.follow_up_date !== null && note.follow_up_date < today;
+              !done &&
+              note.follow_up_date !== null &&
+              note.follow_up_date < today;
             return (
               <li
                 key={note.id}
@@ -104,14 +107,39 @@ export function NotesPanel({
                   {note.follow_up_date && (
                     <span
                       className={
-                        overdue
-                          ? "font-semibold text-red-600"
-                          : "text-blue-600"
+                        done
+                          ? "text-gray-500 line-through"
+                          : overdue
+                            ? "font-semibold text-red-600"
+                            : "text-blue-600"
                       }
                     >
-                      {overdue ? "⚠ Follow-up overdue: " : "Follow-up: "}
+                      {done
+                        ? "✓ Follow-up done: "
+                        : overdue
+                          ? "⚠ Follow-up overdue: "
+                          : "Follow-up: "}
                       {formatDate(note.follow_up_date)}
                     </span>
+                  )}
+                  {/* Notes are loaded with select("*"), so the key is absent
+                      until migration 0008 adds the column — no button then. */}
+                  {note.follow_up_date && "follow_up_done_at" in note && (
+                    <form
+                      action={setFollowUpDone.bind(
+                        null,
+                        note.id,
+                        learnerId,
+                        !done
+                      )}
+                    >
+                      <button
+                        type="submit"
+                        className="text-xs font-medium text-blue-600 hover:underline"
+                      >
+                        {done ? "Reopen" : "Mark done"}
+                      </button>
+                    </form>
                   )}
                   <form
                     action={deleteNote.bind(null, note.id, learnerId)}

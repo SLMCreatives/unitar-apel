@@ -80,6 +80,18 @@ export function SelectInput({
   defaultValue?: string | null;
   emptyLabel?: string;
 }) {
+  // A saved value that isn't among the options (a person since renamed or
+  // removed from their list, a name typed in by bulk upload, a retired enum
+  // value) would otherwise fall back to the empty option and be wiped on the
+  // next save. Keep it selectable, and say why it looks different.
+  const unlisted =
+    defaultValue &&
+    !options.some(
+      (opt) => (typeof opt === "string" ? opt : opt.value) === defaultValue
+    )
+      ? defaultValue
+      : null;
+
   return (
     <div>
       <label htmlFor={name} className={LABEL_CLASS}>
@@ -92,6 +104,9 @@ export function SelectInput({
         className={INPUT_CLASS}
       >
         <option value="">{emptyLabel}</option>
+        {unlisted && (
+          <option value={unlisted}>{unlisted} (not in list)</option>
+        )}
         {options.map((opt) => {
           const o = typeof opt === "string" ? { value: opt, label: opt } : opt;
           return (

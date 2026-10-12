@@ -4,11 +4,15 @@ import { requirePermission } from "@/lib/auth";
 import { QueryError, SetupNotice, envReady } from "@/components/setup-notice";
 import { latestInstrumentResult } from "@/lib/instruments";
 import { AGE_BUCKETS, ageBucket, leadAge } from "@/lib/lead-ageing";
+import {
+  WINDOW_LIMIT_MONTHS,
+  WINDOW_WARNING_MONTHS,
+  isInProgress,
+  monthsSince,
+} from "@/lib/offer-window";
 import { ASSESSMENT_STAGES, LEARNER_STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const AVG_DAYS_PER_MONTH = 30.44;
 
 type Row = {
   id: number;
@@ -91,7 +95,18 @@ export default async function DashboardPage() {
   await requirePermission("dashboard");
 
   const supabase = await createClient();
-  const [learnersRes, notesRes, ageingRes] = await Promise.all([
+  // Follow-ups still open. follow_up_done_at arrives with migration 0008;
+  // until then the filtered query errors and every follow-up is listed.
+  const followUps = (openOnly: boolean) => {
+    let query = supabase
+      .from("apel_notes")
+      .select("id, learner_id, body, follow_up_date")
+      .not("follow_up_date", "is", null);
+    if (openOnly) query = query.is("follow_up_done_at", null);
+    return query.order("follow_up_date");
+  };
+
+  const [learnersRes, openNotesRes, ageingRes] = await Promise.all([
     supabase
       .from("apel")
       .select(
@@ -99,11 +114,7 @@ export default async function DashboardPage() {
         // supabase-js types the select from the literal string.
         "id, name, learner_status, assessment_stage, sponsor, advisor, registration_payment_status, offer_letter_issued_date, portfolio_result_status, fvv_result_status, challenge_test_result_status, capstone_result_status"
       ),
-    supabase
-      .from("apel_notes")
-      .select("id, learner_id, body, follow_up_date")
-      .not("follow_up_date", "is", null)
-      .order("follow_up_date"),
+    followUps(true),
     // Separate from the main query so the dashboard still loads before
     // migration 0007 adds updated_at — only the ageing section is affected.
     supabase.from("apel").select("id, created_at, updated_at"),
@@ -112,15 +123,15 @@ export default async function DashboardPage() {
   if (learnersRes.error)
     return <QueryError message={learnersRes.error.message} />;
   const learners = (learnersRes.data ?? []) as Row[];
+  const notesRes = openNotesRes.error ? await followUps(false) : openNotesRes;
   const notes = (notesRes.data ?? []) as NoteRow[];
 
   const count = (fn: (l: Row) => boolean) => learners.filter(fn).length;
 
-  // 12-month window health — only learners still in progress
+  // 12-month window health — only learners still in progress (not completed,
+  // graduated or withdrawn)
   const now = Date.now();
-  const inProgress = learners.filter(
-    (l) => l.assessment_stage !== "COMPLETED" && l.assessment_stage !== "GRADUATED"
-  );
+  const inProgress = learners.filter(isInProgress);
   let onTrack = 0,
     nearing = 0,
     overdue = 0,
@@ -130,11 +141,9 @@ export default async function DashboardPage() {
       noOffer++;
       continue;
     }
-    const months =
-      (now - new Date(l.offer_letter_issued_date).getTime()) /
-      (1000 * 60 * 60 * 24 * AVG_DAYS_PER_MONTH);
-    if (months >= 12) overdue++;
-    else if (months >= 9) nearing++;
+    const months = monthsSince(l.offer_letter_issued_date, now);
+    if (months >= WINDOW_LIMIT_MONTHS) overdue++;
+    else if (months >= WINDOW_WARNING_MONTHS) nearing++;
     else onTrack++;
   }
 

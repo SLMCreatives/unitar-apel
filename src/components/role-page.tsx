@@ -362,6 +362,11 @@ export async function RolePage({
       <div className="space-y-4">
         {visiblePersonnel.map((person) => {
           const assigned = visibleAssignments(person.name);
+          // One learner can hold an assignment per stage, so count learners
+          // and assignments separately.
+          const allAssignments = byPersonnelName.get(person.name) ?? [];
+          const learnerCount = new Set(allAssignments.map((a) => a.learner_id))
+            .size;
           return (
             <section
               key={person.id}
@@ -376,7 +381,13 @@ export async function RolePage({
                     <span>
                       Learners assigned:{" "}
                       <span className="font-semibold text-gray-800">
-                        {(byPersonnelName.get(person.name) ?? []).length}
+                        {learnerCount}
+                      </span>
+                    </span>
+                    <span>
+                      Assignments:{" "}
+                      <span className="font-semibold text-gray-800">
+                        {allAssignments.length}
                       </span>
                     </span>
                     {person.remark && <span>Remark: {person.remark}</span>}

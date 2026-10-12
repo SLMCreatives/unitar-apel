@@ -184,6 +184,7 @@ export type Learner = {
   // learnerPayload so saves leave the recorded dates alone. Read-only history,
   // still exportable via Reports.
   apel_examination_board_date: string | null;
+  // Still edited in the learner form (Learner Progress Information).
   senate_date: string | null;
   progress_remark: string | null;
   // Milestones / claims
@@ -244,6 +245,9 @@ export type LearnerNote = {
   learner_id: number;
   body: string;
   follow_up_date: string | null;
+  // Added by migration 0008 and absent until it runs. Set when the follow-up
+  // is marked done; null while it is still open.
+  follow_up_done_at?: string | null;
   author: string | null;
   created_at: string;
 };
