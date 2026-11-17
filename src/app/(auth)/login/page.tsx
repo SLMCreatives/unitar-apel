@@ -1,26 +1,31 @@
-import { login } from "@/app/auth/actions";
-import { AuthForm } from "@/components/auth-form";
+import { redirect } from "next/navigation";
+import { LoginForm } from "@/components/login-form";
 import { SetupNotice, envReady } from "@/components/setup-notice";
+import { getCurrentUser, landingPath, safeNextPath } from "@/lib/auth";
 
 export const metadata = { title: "Sign in — UNITAR APEL.Q Tracker" };
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ next?: string | string[] }>;
 }) {
-  if (!envReady()) return <SetupNotice />;
-  const { error } = await searchParams;
+  // Already signed in → skip the form. This check lives here (with a real
+  // session lookup) rather than in the proxy: the proxy only sees whether a
+  // cookie exists, and bouncing on a stale cookie would loop with the page
+  // guards' redirect back to /login. It runs before the env check because it
+  // reads the session cookie, which keeps this page rendered per request.
+  const user = await getCurrentUser();
+  if (user) {
+    redirect(
+      user.status === "active"
+        ? landingPath(user.sections, user.isSuperadmin)
+        : "/pending"
+    );
+  }
 
-  return (
-    <div className="space-y-3">
-      {error === "link" && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          That link was invalid or has expired. Request a new password reset
-          below.
-        </p>
-      )}
-      <AuthForm mode="login" action={login} />
-    </div>
-  );
+  if (!envReady()) return <SetupNotice />;
+
+  const { next } = await searchParams;
+  return <LoginForm next={safeNextPath(next) ?? undefined} />;
 }

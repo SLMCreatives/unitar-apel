@@ -40,12 +40,17 @@ It adds two more via
    and run it.
 
 2. **Configure environment variables**: copy `.env.local.example` to
-   `.env.local` and fill in the values from **Project Settings → API**:
+   `.env.local` and fill in the values from **Project Settings → API Keys**:
 
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SECRET_KEY=your-secret-key
+   RESEND_API_KEY=            # optional locally
+   EMAIL_FROM=                # optional locally
    ```
+
+   Without `RESEND_API_KEY` / `EMAIL_FROM`, `npm run dev` prints sign-in codes
+   in the terminal instead of emailing them.
 
 3. **Install and run**:
 
@@ -64,7 +69,18 @@ It adds two more via
 
 ## Security note
 
-v1 has no login — the database policies allow full access with the anon key,
-so anyone with the app URL can read and edit data. Keep it on a private
-machine/network, or add Supabase Auth (and tighten the RLS policies in the
-migration) before deploying it publicly.
+The Supabase project is shared with another UNITAR app, so APEL does **not**
+use Supabase Auth. Instead:
+
+- **Login** is a 6-digit code emailed to a UNITAR address (sent with Resend).
+  A first sign-in creates a *pending* account; a superadmin activates it and
+  assigns a role under **Admin**. Accounts, codes and sessions live in
+  `apel_users`, `apel_login_codes` and `apel_sessions`
+  ([0009](supabase/migrations/0009_custom_auth.sql)).
+- **Database access** happens only on the server, with the secret key. Every
+  page, Server Action and Route Handler checks the session first
+  (`src/lib/auth.ts`).
+- **The APEL tables are closed to the public anon key** by
+  [0010](supabase/migrations/0010_lock_down_apel_tables.sql). Apply it only
+  after the app is deployed with `SUPABASE_SECRET_KEY`; the file explains the
+  order.

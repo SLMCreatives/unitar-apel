@@ -1,5 +1,5 @@
-// App access sections. A user's access role (see app_roles / profiles in
-// supabase/migrations/0003) grants a subset of these keys, and that decides
+// App access sections. A user's access role (see app_roles / apel_users in
+// supabase/migrations/0003 and 0009) grants a subset of these keys, and that decides
 // both which nav links show (src/app/layout.tsx) and which routes/actions the
 // user may reach (guards in src/lib/auth.ts). This is the single source of
 // truth — add a section here and wire its `href`/guard to extend the app.

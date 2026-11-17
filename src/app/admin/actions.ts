@@ -18,7 +18,7 @@ async function otherActiveSuperadmins(
   exceptId: string
 ): Promise<number> {
   const { count } = await supabase
-    .from("profiles")
+    .from("apel_users")
     .select("id", { count: "exact", head: true })
     .eq("is_superadmin", true)
     .eq("status", "active")
@@ -26,13 +26,14 @@ async function otherActiveSuperadmins(
   return count ?? 0;
 }
 
-// Applies status / role / superadmin changes to one profile. Superadmin-only.
+// Applies status / role / superadmin changes to one account (apel_users).
+// Superadmin-only.
 export async function updateUser(userId: string, formData: FormData) {
   await requireSuperadmin();
 
   const supabase = await createClient();
   const { data: target, error: loadErr } = await supabase
-    .from("profiles")
+    .from("apel_users")
     .select("id, is_superadmin, status")
     .eq("id", userId)
     .maybeSingle<{ id: string; is_superadmin: boolean; status: Status }>();
@@ -65,10 +66,16 @@ export async function updateUser(userId: string, formData: FormData) {
   }
 
   const { error } = await supabase
-    .from("profiles")
+    .from("apel_users")
     .update({ status, role_id: roleId, is_superadmin: isSuperadmin })
     .eq("id", userId);
   if (error) throw new Error(error.message);
+
+  // Disabling signs the person out everywhere. (Their status is re-read on
+  // every request anyway, so this just tidies up their sessions.)
+  if (status === "disabled") {
+    await supabase.from("apel_sessions").delete().eq("user_id", userId);
+  }
 
   revalidatePath("/admin/users");
 }

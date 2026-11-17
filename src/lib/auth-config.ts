@@ -1,22 +1,28 @@
-// TEMPORARY: authentication kill switch.
+// Authentication settings.
 //
-// Auth is fully built (login/signup, roles, per-section permissions, RLS in
-// supabase/migrations/0003) but switched OFF while the app is still being
-// developed. With it off the whole app is open: no login, every section
-// visible, every guard passes as the bypass user below.
+// APEL signs people in with a 6-digit code emailed to them — it does NOT use
+// Supabase Auth, because the Supabase project is shared with another UNITAR app
+// (see supabase/migrations/0009_custom_auth.sql). Accounts live in apel_users,
+// sessions in apel_sessions; src/lib/auth.ts and src/app/auth/actions.ts hold
+// the logic.
 //
-// 0003 has already been applied to the live project, so its authenticated-only
-// RLS policies had to be reopened for the anon key — see
-// supabase/migrations/0004_auth_off_reopen_rls.sql. Both halves matter: the app
-// bypass here and the open policies there.
-//
-// To turn auth back on:
-//   1. set AUTH_ENABLED = true here
-//   2. re-run supabase/migrations/0003_auth_and_roles.sql in the Supabase SQL
-//      editor (it drops the open policies 0004 restored and locks the tables
-//      back down)
-//   3. sign up with the superadmin email seeded in that migration
-//
-// Kept in its own module with no imports so it is safe to read from the proxy
-// (edge runtime), Server Components and Client Components alike.
-export const AUTH_ENABLED = false;
+// Kept in its own module with no imports so it is safe to read from the proxy,
+// Server Components and Client Components alike.
+
+// Kill switch. With it false the whole app is open: no login, every section
+// visible, every guard passes as a stand-in superadmin (src/lib/auth.ts). Only
+// for local development — once migration 0010 has locked the tables, the app
+// still reads data with the secret key, so turning this off in production
+// would publish every learner record to anyone with the URL.
+export const AUTH_ENABLED = true;
+
+// Who may request a sign-in code. Anyone whose email ends in one of these
+// domains can sign in; a first sign-in creates a *pending* account that a
+// superadmin must activate before it sees any data. Emails that already have a
+// row in apel_users may always request a code, whatever their domain — so an
+// outside address can be let in by inserting its row in Supabase.
+export const ALLOWED_EMAIL_DOMAINS = ["unitar.my"];
+
+// Name of the httpOnly cookie that holds the session token. Read by the proxy
+// (presence only) and by src/lib/auth.ts (validated against apel_sessions).
+export const SESSION_COOKIE = "apel_session";

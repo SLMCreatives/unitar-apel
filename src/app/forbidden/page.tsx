@@ -14,6 +14,7 @@ export default async function ForbiddenPage() {
   if (!AUTH_ENABLED) redirect("/");
 
   const user = await getCurrentUser();
+  if (!user) redirect("/login");
   // First section this user actually can reach, so "go back" never bounces
   // them straight back here.
   const landing = user

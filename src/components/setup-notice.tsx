@@ -1,7 +1,9 @@
+// The app talks to Supabase only from the server, with the secret key (see
+// src/lib/supabase/server.ts). SUPABASE_SECRET_KEY has no NEXT_PUBLIC_ prefix,
+// so this always reads false in the browser — call it from server code only.
 export function envReady() {
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
   );
 }
 
@@ -17,17 +19,16 @@ export function SetupNotice() {
           <span className="font-mono">supabase.com</span>
         </li>
         <li>
-          Run the SQL files in <span className="font-mono">
-            supabase/migrations
-          </span>{" "}
-          (0001, then 0002) in the SQL Editor. Skip 0003 — it turns on
-          authentication, which is switched off for now (run 0004 if 0003 has
-          already been applied).
+          Run the SQL files in{" "}
+          <span className="font-mono">supabase/migrations</span> in order in
+          the SQL Editor (apply 0010 only after the app is deployed with the
+          secret key — see the note at the top of that file).
         </li>
         <li>
           Copy <span className="font-mono">.env.local.example</span> to{" "}
-          <span className="font-mono">.env.local</span> and fill in your project
-          URL and anon key
+          <span className="font-mono">.env.local</span> and fill in the project
+          URL and the <span className="font-mono">secret</span> key from
+          Project Settings → API Keys
         </li>
         <li>Restart the dev server</li>
       </ol>
@@ -42,8 +43,8 @@ export function QueryError({ message }: { message: string }) {
       <p className="mt-1 font-mono text-xs">{message}</p>
       <p className="mt-2">
         If tables are missing, run the SQL files in{" "}
-        <span className="font-mono">supabase/migrations</span> (0001, then
-        0002) in the Supabase SQL Editor.
+        <span className="font-mono">supabase/migrations</span> in order in the
+        Supabase SQL Editor.
       </p>
     </div>
   );

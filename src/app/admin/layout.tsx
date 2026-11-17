@@ -11,8 +11,8 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   // These pages manage accounts and roles, which do not exist while auth is
-  // off (src/lib/auth-config.ts) — the profiles/app_roles tables come with
-  // migration 0003.
+  // off (src/lib/auth-config.ts) — the apel_users/app_roles tables come with
+  // migrations 0003 and 0009.
   if (!AUTH_ENABLED) redirect("/");
 
   await requireSuperadmin();

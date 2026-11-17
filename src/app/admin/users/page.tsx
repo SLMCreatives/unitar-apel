@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users — UNITAR APEL.Q Tracker" };
 
-type ProfileRow = {
+type UserRow = {
   id: string;
   email: string | null;
   full_name: string | null;
@@ -18,7 +18,7 @@ type ProfileRow = {
 
 type RoleRow = { id: number; label: string };
 
-const STATUS_STYLES: Record<ProfileRow["status"], string> = {
+const STATUS_STYLES: Record<UserRow["status"], string> = {
   active: "bg-green-100 text-green-800",
   pending: "bg-amber-100 text-amber-800",
   disabled: "bg-gray-200 text-gray-600",
@@ -29,18 +29,18 @@ export default async function UsersPage() {
 
   const me = await getCurrentUser();
   const supabase = await createClient();
-  const [profilesRes, rolesRes] = await Promise.all([
+  const [usersRes, rolesRes] = await Promise.all([
     supabase
-      .from("profiles")
+      .from("apel_users")
       .select("id, email, full_name, status, is_superadmin, role_id, created_at")
       .order("created_at", { ascending: true }),
     supabase.from("app_roles").select("id, label").order("label"),
   ]);
 
-  if (profilesRes.error)
-    return <QueryError message={profilesRes.error.message} />;
+  if (usersRes.error)
+    return <QueryError message={usersRes.error.message} />;
 
-  const users = (profilesRes.data ?? []) as ProfileRow[];
+  const users = (usersRes.data ?? []) as UserRow[];
   const roles = (rolesRes.data ?? []) as RoleRow[];
   const pendingCount = users.filter((u) => u.status === "pending").length;
 
@@ -54,8 +54,9 @@ export default async function UsersPage() {
           </span>
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          New signups start as <span className="font-medium">pending</span> with
-          no access. Set a user to <span className="font-medium">active</span>{" "}
+          Anyone with a UNITAR email can sign in with an emailed code; their
+          first sign-in creates a{" "}
+          <span className="font-medium">pending</span> account with no access. Set a user to <span className="font-medium">active</span>{" "}
           and assign a role to let them in.
           {pendingCount > 0 && (
             <span className="ml-1 font-medium text-amber-700">
@@ -152,8 +153,8 @@ export default async function UsersPage() {
 
       <p className="text-xs text-gray-400">
         Superadmins have access to every section and to this admin area.
-        Removing a user completely (from authentication) is done in the Supabase
-        dashboard — here you can disable their access.
+        Disabling an account signs that person out and stops them requesting
+        new sign-in codes.
       </p>
     </div>
   );
